@@ -7,6 +7,7 @@ const api: DashboardApi = {
   getRuntimeInfo: () => ipcRenderer.invoke('runtime:get'),
   getConfig: () => ipcRenderer.invoke('config:get'),
   installKindle: () => ipcRenderer.invoke('kindle:install'),
+  uninstallKindle: () => ipcRenderer.invoke('kindle:uninstall'),
   openLogin: (tool: AuthLoginTool) => ipcRenderer.invoke('auth:openLogin', tool),
   openRepo: () => ipcRenderer.invoke('app:openRepo'),
   renderNow: () => ipcRenderer.invoke('render:now'),

@@ -77,6 +77,7 @@ export interface DashboardApi {
   getRuntimeInfo: () => Promise<RuntimeInfo>
   getConfig: () => Promise<DashboardConfig>
   installKindle: () => Promise<KindleInstallResult>
+  uninstallKindle: () => Promise<KindleInstallResult>
   openLogin: (tool: AuthLoginTool) => Promise<void>
   openRepo: () => Promise<void>
   renderNow: () => Promise<RenderResult>

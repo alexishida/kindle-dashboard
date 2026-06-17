@@ -410,10 +410,7 @@ h3 {
 
 .dashboard-grid {
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  align-items: start;
-  gap: 16px;
+  display: block;
 }
 
 /* ---- panels ---- */
@@ -456,6 +453,36 @@ h3 {
 
 .wide-field {
   display: block;
+}
+
+.scripts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.scripts-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scripts-hint {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+button.danger {
+  color: #ff9a9a;
+  border-color: var(--line-2);
+}
+
+button.danger:hover:not(:disabled) {
+  background: rgba(255, 90, 90, 0.12);
+  border-color: #ff7a7a;
+  color: #ffb4b4;
 }
 
 .diagnostics-panel {
@@ -563,6 +590,11 @@ h3 {
 
 /* ---- preview / painel ---- */
 
+.preview-wrap {
+  display: grid;
+  gap: 12px;
+}
+
 .preview-panel {
   overflow: hidden;
   background: #fff;
@@ -571,6 +603,8 @@ h3 {
   /* mesma proporcao do Kindle deitado (paisagem 1448x1072) */
   aspect-ratio: 1448 / 1072;
   width: 100%;
+  max-width: min(100%, 1360px);
+  margin: 0 auto;
 }
 
 .preview-stage {
@@ -595,40 +629,9 @@ h3 {
   font-weight: 700;
 }
 
-.side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: auto;
-}
-
-.metric {
-  display: grid;
-  gap: 5px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.metric span {
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.metric strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-}
-
-.button-column {
-  display: grid;
-  gap: 8px;
-  margin-top: 4px;
+.preview-error {
+  max-width: min(100%, 1360px);
+  margin: 0 auto;
 }
 
 .muted {
@@ -649,10 +652,6 @@ h3 {
   }
 
   .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .side-panel {
-    display: none;
+    display: block;
   }
 }

@@ -100,6 +100,7 @@ export default function App(): React.JSX.Element {
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [checkingKindle, setCheckingKindle] = useState(false)
   const [installing, setInstalling] = useState(false)
+  const [uninstalling, setUninstalling] = useState(false)
   const [previewKey, setPreviewKey] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -242,6 +243,32 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function handleUninstallKindle(): Promise<void> {
+    const confirmed = window.confirm(
+      'Desinstalar os scripts do Kindle? O autostart do dashboard sera removido do aparelho.',
+    )
+    if (!confirmed) return
+
+    const saved = await saveCurrentConfig()
+    if (!saved) return
+
+    setUninstalling(true)
+    setError(null)
+    setMessage(null)
+    setInstallOutput(null)
+    try {
+      const result = await window.dashboard.uninstallKindle()
+      setConfig(result.config)
+      setForm(formFromConfig(result.config))
+      setInstallOutput(result.output)
+      setMessage('Scripts desinstalados do Kindle')
+    } catch (uninstallError) {
+      setError(uninstallError instanceof Error ? uninstallError.message : String(uninstallError))
+    } finally {
+      setUninstalling(false)
+    }
+  }
+
   async function handleRender(): Promise<void> {
     setRendering(true)
     setError(null)
@@ -367,45 +394,16 @@ export default function App(): React.JSX.Element {
         <main className="content">
           {nav === 'painel' && configured ? (
             <section className="dashboard-grid">
-              <section className="preview-panel">
-                {runtime ? (
-                  <PreviewFrame baseUrl={runtime.baseUrl} previewKey={previewKey} />
-                ) : (
-                  <div className="loading">Iniciando o dashboard...</div>
-                )}
+              <section className="preview-wrap">
+                <section className="preview-panel">
+                  {runtime ? (
+                    <PreviewFrame baseUrl={runtime.baseUrl} previewKey={previewKey} />
+                  ) : (
+                    <div className="loading">Iniciando o dashboard...</div>
+                  )}
+                </section>
+                {error ? <div className="notice error preview-error">{error}</div> : null}
               </section>
-
-              <aside className="panel side-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Operacao</p>
-                    <h2>Estado</h2>
-                  </div>
-                </div>
-                <div className="metric">
-                  <span>Kindle</span>
-                  <strong>{config?.kindleIp}:{config?.kindlePort}</strong>
-                </div>
-                <div className="metric">
-                  <span>Auth</span>
-                  <strong>{auth?.ok ? 'OK' : `${authNeedsAction.length} acao`}</strong>
-                </div>
-                <div className="metric">
-                  <span>PNG</span>
-                  <strong title={runtime?.outputPath}>{runtime?.outputPath ?? 'preparando'}</strong>
-                </div>
-                <div className="metric">
-                  <span>URL Kindle</span>
-                  <strong title={runtime?.imageUrl}>{runtime?.imageUrl ?? '...'}</strong>
-                </div>
-                <div className="button-column">
-                  <button type="button" onClick={() => setNav('kindle')}>Abrir configuracoes</button>
-                  <button type="button" className="ghost" onClick={() => void refreshAuth()} disabled={checkingAuth}>
-                    {checkingAuth ? 'Checando...' : 'Reverificar logins'}
-                  </button>
-                </div>
-                {error ? <div className="notice error">{error}</div> : null}
-              </aside>
             </section>
           ) : null}
 
@@ -469,12 +467,24 @@ export default function App(): React.JSX.Element {
 
                 <div className="button-row">
                   <button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
-                  <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={saving || checkingKindle}>
+                  <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={saving || checkingKindle || installing || uninstalling}>
                     {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
                   </button>
-                  <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing}>
-                    {installing ? 'Instalando...' : 'Injetar scripts'}
-                  </button>
+                </div>
+
+                <div className="scripts-section">
+                  <div className="scripts-head">
+                    <p className="eyebrow">Scripts</p>
+                    <span className="scripts-hint">Instala ou remove o autostart do dashboard no Kindle.</span>
+                  </div>
+                  <div className="button-row">
+                    <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                      {installing ? 'Instalando...' : 'Instalar scripts'}
+                    </button>
+                    <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                      {uninstalling ? 'Desinstalando...' : 'Desinstalar Script'}
+                    </button>
+                  </div>
                 </div>
 
                 {message ? <div className="notice ok">{message}</div> : null}

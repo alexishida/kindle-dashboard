@@ -7,7 +7,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const ROOT = path.join(os.homedir(), '.codex', 'sessions');
+// O Codex move sessoes encerradas de sessions/ para archived_sessions/. Varremos
+// as duas: sessions/ pega a sessao ativa (mais recente), archived_sessions/ o resto.
+const CODEX_DIR = path.join(os.homedir(), '.codex');
+const ROOTS = [
+  path.join(CODEX_DIR, 'sessions'),
+  path.join(CODEX_DIR, 'archived_sessions'),
+];
 
 function rolloutsByRecency() {
   const out = [];
@@ -20,7 +26,7 @@ function rolloutsByRecency() {
       else if (e.name.startsWith('rollout-') && e.name.endsWith('.jsonl')) out.push({ p, m: fs.statSync(p).mtimeMs });
     }
   };
-  walk(ROOT);
+  for (const root of ROOTS) walk(root);
   return out.sort((a, b) => b.m - a.m).map((x) => x.p);
 }
 

@@ -431,6 +431,25 @@ async function installKindle(): Promise<KindleInstallResult> {
   }
 }
 
+async function uninstallKindle(): Promise<KindleInstallResult> {
+  const config = await loadConfig()
+
+  const result = await kindleAutostartModule().runAction('uninstall', {
+    env: kindleEnvironment(config),
+    ssh: sshOptions(config),
+  })
+  if (result.code !== 0) throw new Error(result.output || `Uninstall failed with exit ${result.code}`)
+
+  const next = { ...config, setupComplete: false }
+  await writeConfig(next)
+  createTray()
+
+  return {
+    config: publicConfig(next),
+    output: result.output,
+  }
+}
+
 function loginScript(tool: AuthLoginTool): string {
   const label = tool === 'claude' ? 'Claude Code' : 'OpenAI Codex'
   const command = tool === 'claude' ? 'claude' : 'codex login'
@@ -790,6 +809,7 @@ function registerIpc(): void {
   ipcMain.handle('app:openRepo', () => shell.openExternal(REPO_URL))
   ipcMain.handle('kindle:check', (): Promise<KindleStatus> => checkKindle())
   ipcMain.handle('kindle:install', (): Promise<KindleInstallResult> => installKindle())
+  ipcMain.handle('kindle:uninstall', (): Promise<KindleInstallResult> => uninstallKindle())
   ipcMain.handle('render:now', () => renderDashboard())
   ipcMain.handle('app:quit', () => {
     quitApplication()

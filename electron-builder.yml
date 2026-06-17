@@ -1,0 +1,30 @@
+appId: com.alexi.kindle-dashboard
+productName: Kindle Dashboard
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist/**/*
+  - backend/**/*
+  - render/**/*
+  - kindle/**/*
+  - package.json
+
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+
+asar: true
+
+win:
+  target: nsis
+  icon: build/icon.png
+  artifactName: Kindle-Dashboard-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false

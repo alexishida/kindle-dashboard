@@ -1,0 +1,48 @@
+{
+  "name": "kindle-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Alexi",
+  "description": "Always-on AI usage dashboard rendered to a Kindle Paperwhite.",
+  "main": "dist/main/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node scripts/electron-vite.js dev",
+    "dev": "node scripts/electron-vite.js dev",
+    "build": "npm run typecheck && node scripts/electron-vite.js build",
+    "preview": "node scripts/electron-vite.js preview",
+    "build:win": "npm run build && electron-builder --win",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "backend": "node backend/server.js",
+    "supervisor": "node scripts/supervisor.js",
+    "kindle": "node scripts/kssh.js",
+    "kindle:autostart": "node scripts/kindle-autostart.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "autostart:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 Install",
+    "autostart:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 Status",
+    "autostart:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 Stop",
+    "autostart:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 Uninstall"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.15.41",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.5"
+  }
+}

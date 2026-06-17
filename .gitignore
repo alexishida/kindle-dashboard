@@ -1,0 +1,15 @@
+node_modules/
+out/*
+!out/.gitkeep
+dist/
+release/
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+.claude/
+.codex/
+AGENTS.md
+CLAUDE.md
+.ai-framework/skills/

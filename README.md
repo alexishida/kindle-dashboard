@@ -12,6 +12,16 @@ desbloqueado, com SSH e FBInk disponiveis.
 
 ---
 
+## Screenshots
+
+| Painel | Configuracao Kindle |
+|---|---|
+| ![painel](screenshot/painel.jpg) | ![kindle-config](screenshot/kindle-config.jpg) |
+| **Diagnostico e Instalacao** | **Logins** |
+| ![kindle-install](screenshot/kindle-install.jpg) | ![logins](screenshot/logins.jpg) |
+
+---
+
 ## Guia de Uso
 
 ### 1. Requisitos

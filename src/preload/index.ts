@@ -8,6 +8,7 @@ const api: DashboardApi = {
   getConfig: () => ipcRenderer.invoke('config:get'),
   installKindle: () => ipcRenderer.invoke('kindle:install'),
   openLogin: (tool: AuthLoginTool) => ipcRenderer.invoke('auth:openLogin', tool),
+  openRepo: () => ipcRenderer.invoke('app:openRepo'),
   renderNow: () => ipcRenderer.invoke('render:now'),
   saveConfig: (config: DashboardConfigInput) => ipcRenderer.invoke('config:save', config),
   quit: () => ipcRenderer.invoke('app:quit'),

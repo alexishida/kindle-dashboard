@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import type { Server } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, shell, Tray } from 'electron'
 import type {
   AuthLoginTool,
   AuthSourceStatus,
@@ -73,8 +73,8 @@ interface StoredDashboardConfig {
 }
 
 const PORT = positiveInt(process.env.PORT, 8787)
-const RENDER_INTERVAL_SECONDS = positiveInt(process.env.RENDER_INTERVAL, 60)
 const BASE_URL = `http://127.0.0.1:${PORT}`
+const REPO_URL = 'https://github.com/alexishida/kindle-dashboard'
 const CAPTURE_WIDTH = 1072
 const CAPTURE_HEIGHT = 1448
 const LANDSCAPE_CAPTURE_WIDTH = CAPTURE_HEIGHT
@@ -85,6 +85,7 @@ let captureWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let backendServer: Server | null = null
 let renderTimer: NodeJS.Timeout | null = null
+let renderIntervalSeconds = 0
 let renderInFlight: Promise<RenderResult> | null = null
 let lastRenderResult: RenderResult | null = null
 let dashboardConfig: StoredDashboardConfig | null = null
@@ -290,6 +291,7 @@ async function saveConfig(raw: unknown): Promise<DashboardConfig> {
   if (password) Object.assign(next, encryptedPasswordFields(password))
 
   await writeConfig(next)
+  if (next.kindleRefreshInterval !== renderIntervalSeconds) scheduleRender(next.kindleRefreshInterval)
   return publicConfig(next)
 }
 
@@ -537,9 +539,10 @@ function createMainWindow(options: { showOnReady: boolean } = { showOnReady: tru
     minWidth: 980,
     minHeight: 720,
     show: false,
-    title: 'Kindle Dashboard',
+    title: `Kindle Dashboard v${app.getVersion()}`,
     icon: appAssetPath('icon.png'),
     backgroundColor: '#e9e5dc',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -565,6 +568,12 @@ function createMainWindow(options: { showOnReady: boolean } = { showOnReady: tru
   window.once('ready-to-show', () => {
     if (options.showOnReady) window.show()
   })
+  window.on('page-title-updated', (event) => {
+    event.preventDefault()
+  })
+
+  window.setMenuBarVisibility(false)
+  window.setMenu(null)
 
   if (rendererUrl) {
     void window.loadURL(rendererUrl)
@@ -673,6 +682,7 @@ function createCaptureWindow(viewport: CaptureViewport): BrowserWindow {
     useContentSize: true,
     frame: false,
     show: false,
+    autoHideMenuBar: true,
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
@@ -750,12 +760,14 @@ function renderDashboard(): Promise<RenderResult> {
   return renderInFlight
 }
 
-function scheduleRender(): void {
+function scheduleRender(intervalSeconds: number): void {
+  if (renderTimer) clearInterval(renderTimer)
+  renderIntervalSeconds = intervalSeconds
   renderTimer = setInterval(() => {
     void renderDashboard().catch((error) => {
       console.error('render failed', error)
     })
-  }, RENDER_INTERVAL_SECONDS * 1000)
+  }, intervalSeconds * 1000)
 }
 
 function registerIpc(): void {
@@ -768,13 +780,14 @@ function registerIpc(): void {
       imageUrl: config.dashboardUrl,
       lastRender: lastRenderResult,
       outputPath,
-      renderIntervalSeconds: RENDER_INTERVAL_SECONDS,
+      renderIntervalSeconds,
     }
   })
   ipcMain.handle('config:get', async (): Promise<DashboardConfig> => publicConfig(await loadConfig()))
   ipcMain.handle('config:save', (_event, config: DashboardConfigInput) => saveConfig(config))
   ipcMain.handle('auth:check', (): AuthStatus => getAuthStatus())
   ipcMain.handle('auth:openLogin', (_event, tool: AuthLoginTool): void => openLogin(tool))
+  ipcMain.handle('app:openRepo', () => shell.openExternal(REPO_URL))
   ipcMain.handle('kindle:check', (): Promise<KindleStatus> => checkKindle())
   ipcMain.handle('kindle:install', (): Promise<KindleInstallResult> => installKindle())
   ipcMain.handle('render:now', () => renderDashboard())
@@ -833,6 +846,8 @@ function quitApplication(): void {
     })
 }
 
+app.setName('kindle-dashboard')
+
 const hasLock = app.requestSingleInstanceLock()
 if (!hasLock) {
   app.exit(0)
@@ -843,14 +858,15 @@ if (!hasLock) {
 
   app.whenReady().then(async () => {
     app.setAppUserModelId('com.alexi.kindle-dashboard')
+    Menu.setApplicationMenu(null)
     outputPath = runtimeOutputPath()
     dashboardConfig = await loadConfig()
+    scheduleRender(dashboardConfig.kindleRefreshInterval)
     registerIpc()
     await startBackend()
     mainWindow = createMainWindow({ showOnReady: !dashboardConfig.setupComplete })
     createTray()
     await renderDashboard()
-    scheduleRender()
     if (dashboardConfig.setupComplete) void runStartupChecks()
   }).catch((error) => {
     console.error(error)

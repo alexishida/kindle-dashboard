@@ -8,8 +8,3 @@ release/
 !.env.example
 *.log
 *.pid
-.claude/
-.codex/
-AGENTS.md
-CLAUDE.md
-.ai-framework/skills/

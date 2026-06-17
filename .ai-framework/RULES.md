@@ -46,7 +46,11 @@ Este arquivo e a fonte oficial de regras para o Kindle Dashboard.
 ## Backend e Render
 
 - Porta padrao: `8787`, configuravel por `PORT`.
-- Intervalo padrao de render: `60s`, configuravel por `RENDER_INTERVAL`.
+- No app Electron, o intervalo de render no PC acompanha sempre `kindleRefreshInterval`
+  (campo "Download Kindle" da UI / `KINDLE_REFRESH_INTERVAL`) — nao ha intervalo
+  independente, para nunca renderizar mais rapido do que o Kindle baixa.
+- `scripts/supervisor.js` (modo standalone, sem Electron) usa intervalo proprio
+  via `RENDER_INTERVAL`, padrao `60s`.
 - `GET /api/ping` deve continuar barato e confiavel.
 - `GET /api/auth` verifica credenciais locais sem expor tokens.
 - `GET /api/usage` entrega dados normalizados.

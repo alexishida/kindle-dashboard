@@ -78,6 +78,7 @@ export interface DashboardApi {
   getConfig: () => Promise<DashboardConfig>
   installKindle: () => Promise<KindleInstallResult>
   openLogin: (tool: AuthLoginTool) => Promise<void>
+  openRepo: () => Promise<void>
   renderNow: () => Promise<RenderResult>
   saveConfig: (config: DashboardConfigInput) => Promise<DashboardConfig>
   quit: () => Promise<void>

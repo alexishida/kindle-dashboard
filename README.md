@@ -79,7 +79,7 @@ commite `.env`.
 | Variavel | Uso |
 | --- | --- |
 | `PORT` | Porta HTTP local. Padrao: `8787`. |
-| `RENDER_INTERVAL` | Intervalo de render no PC, em segundos. |
+| `RENDER_INTERVAL` | Intervalo de render no PC, em segundos. So usado por `scripts/supervisor.js` (modo standalone sem Electron); no app Electron o render acompanha automaticamente `KINDLE_REFRESH_INTERVAL`. |
 | `DASHBOARD_URL` | URL completa do PNG para o Kindle. |
 | `KINDLE_IP` | Endereco do Kindle. |
 | `KINDLE_PORT` | Porta SSH do Kindle. |

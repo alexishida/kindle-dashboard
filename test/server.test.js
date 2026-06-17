@@ -46,8 +46,9 @@ test('GET /api/usage?mock=1 returns mock data without calling collectors', async
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.source, 'mock');
-  assert.equal(body.tools.length, 3);
-  assert.equal(body.tools.find((tool) => tool.tool === 'opencode').label, 'OpenCode Go');
+  assert.equal(body.tools.length, 2);
+  assert.ok(body.tools.every((tool) => tool.tool !== 'opencode'));
+  assert.equal(body.tools.find((tool) => tool.tool === 'codex').label, 'OpenAI Codex');
 });
 
 test('GET /api/auth returns local credential status', async () => {

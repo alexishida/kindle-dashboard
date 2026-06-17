@@ -110,6 +110,13 @@ label span {
   font-weight: 700;
 }
 
+label small.field-note {
+  display: block;
+  margin-top: 7px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
 h1,
 h2,
 h3,
@@ -406,6 +413,37 @@ h3 {
 
 .single-grid {
   max-width: 760px;
+}
+
+.subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+}
+
+.subtab {
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.subtab:hover:not(.active) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.subtab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1220;
 }
 
 .dashboard-grid {

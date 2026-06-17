@@ -51,13 +51,6 @@ function mockUsage() {
         tokens: { total: 5155314 },
         confidence: 'mock',
       },
-      {
-        tool: 'opencode',
-        label: 'OpenCode Go',
-        spend: { usd: 0.0182645432, sessions: 4 },
-        balance: null, // sem API de saldo (validado na Fase 0.3)
-        confidence: 'mock',
-      },
     ],
   };
 }

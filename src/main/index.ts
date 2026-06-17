@@ -633,20 +633,8 @@ function createTray(): void {
 function buildTrayMenu(): Menu {
   return Menu.buildFromTemplate([
     {
-      label: 'Abrir painel',
-      click: restoreMainWindow,
-    },
-    {
       label: 'Abrir configuracoes',
       click: showSettingsWindow,
-    },
-    {
-      label: 'Atualizar agora',
-      click: () => {
-        void renderDashboard().catch((error) => {
-          console.error('render failed', error)
-        })
-      },
     },
     { type: 'separator' },
     {

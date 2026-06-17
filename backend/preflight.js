@@ -47,6 +47,8 @@ function checkCodex() {
   }
 }
 
+// OpenCode desativado no dashboard (plano Go sem API). Mantido aqui para re-ativar fácil;
+// não entra em checkAll() enquanto a fonte estiver desligada.
 function checkOpenCode() {
   const r = { name: 'opencode', label: 'OpenCode Go' };
   const dbPath = path.join(H, '.local', 'share', 'opencode', 'opencode.db');
@@ -64,7 +66,7 @@ function checkOpenCode() {
 }
 
 function checkAll() {
-  return [checkClaude(), checkCodex(), checkOpenCode()];
+  return [checkClaude(), checkCodex()];
 }
 
 function printReport(results) {

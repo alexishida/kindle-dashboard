@@ -12,7 +12,8 @@ import type {
 } from '../../shared/types'
 
 type BackendState = 'checking' | 'online' | 'offline'
-type NavKey = 'painel' | 'kindle' | 'logins' | 'diagnostico'
+type NavKey = 'painel' | 'kindle' | 'logins'
+type KindleTab = 'config' | 'diagnostico'
 
 interface NavItem {
   key: NavKey
@@ -25,7 +26,6 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'painel', label: 'Painel', hint: 'Previa e estado', icon: '▦' },
   { key: 'kindle', label: 'Kindle', hint: 'Conexao e scripts', icon: '⚙' },
   { key: 'logins', label: 'Logins', hint: 'Auth das fontes', icon: '◉' },
-  { key: 'diagnostico', label: 'Diagnostico', hint: 'SSH e jailbreak', icon: '✓' },
 ]
 
 interface ConfigForm {
@@ -86,6 +86,27 @@ function statusLabel(ok: boolean): string {
   return ok ? 'OK' : 'Acao'
 }
 
+function dashboardHostFromUrl(value: string): string {
+  try {
+    return new URL(value).hostname
+  } catch {
+    return value
+  }
+}
+
+function dashboardUrlWithHost(currentUrl: string, host: string): string {
+  const trimmedHost = host.trim()
+  if (!trimmedHost) return currentUrl
+
+  try {
+    const url = new URL(currentUrl)
+    url.hostname = trimmedHost
+    return url.toString()
+  } catch {
+    return `http://${trimmedHost}:8787/dash.png`
+  }
+}
+
 export default function App(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null)
   const [config, setConfig] = useState<DashboardConfig | null>(null)
@@ -95,6 +116,7 @@ export default function App(): React.JSX.Element {
   const [backendState, setBackendState] = useState<BackendState>('checking')
   const [lastRender, setLastRender] = useState<string | null>(null)
   const [nav, setNav] = useState<NavKey>('kindle')
+  const [kindleTab, setKindleTab] = useState<KindleTab>('config')
   const [rendering, setRendering] = useState(false)
   const [saving, setSaving] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(false)
@@ -166,7 +188,10 @@ export default function App(): React.JSX.Element {
       setPreviewKey(Date.now())
       setError(null)
     })
-    unsubscribeSettings = window.dashboard.onOpenSettings(() => setNav('kindle'))
+    unsubscribeSettings = window.dashboard.onOpenSettings(() => {
+      setNav('kindle')
+      setKindleTab('config')
+    })
 
     return () => {
       if (timer) window.clearInterval(timer)
@@ -176,6 +201,14 @@ export default function App(): React.JSX.Element {
   }, [checkBackend])
 
   const authNeedsAction = useMemo(() => auth?.sources.filter((source) => !source.ok) ?? [], [auth])
+  const dashboardUrlPreview = useMemo(() => {
+    if (!form?.dashboardUrl) return ''
+    try {
+      return new URL(form.dashboardUrl).toString()
+    } catch {
+      return form.dashboardUrl
+    }
+  }, [form?.dashboardUrl])
 
   function updateForm<K extends keyof ConfigForm>(key: K, value: ConfigForm[K]): void {
     setForm((current) => current ? { ...current, [key]: value } : current)
@@ -212,7 +245,8 @@ export default function App(): React.JSX.Element {
       const status = await window.dashboard.checkKindle()
       setKindle(status)
       setMessage(status.detail)
-      setNav('diagnostico')
+      setNav('kindle')
+      setKindleTab('diagnostico')
     } catch (kindleError) {
       setError(kindleError instanceof Error ? kindleError.message : String(kindleError))
     } finally {
@@ -370,25 +404,22 @@ export default function App(): React.JSX.Element {
             <h1>{activeNav.label}</h1>
           </div>
 
-          <div className="topbar-meta">
-            <span className="meta-item">
-              <span className="meta-key">Ultima imagem</span>
-              <span className="meta-val">{formatTime(lastRender)}</span>
-            </span>
-            <span className="meta-item">
-              <span className="meta-key">Setup</span>
-              <span className="meta-val">{configured ? 'Configurado' : 'Primeiro uso'}</span>
-            </span>
-          </div>
+          {nav === 'painel' ? (
+            <>
+              <div className="topbar-meta">
+                <span className="meta-item">
+                  <span className="meta-key">Ultima imagem</span>
+                  <span className="meta-val">{formatTime(lastRender)}</span>
+                </span>
+              </div>
 
-          <div className="actions">
-            <button type="button" onClick={() => void handleRender()} disabled={rendering || !runtime}>
-              {rendering ? 'Atualizando...' : 'Atualizar agora'}
-            </button>
-            <button className="ghost" type="button" onClick={() => void window.dashboard.quit()}>
-              Encerrar
-            </button>
-          </div>
+              <div className="actions">
+                <button type="button" onClick={() => void handleRender()} disabled={rendering || !runtime}>
+                  {rendering ? 'Atualizando...' : 'Atualizar agora'}
+                </button>
+              </div>
+            </>
+          ) : null}
         </header>
 
         <main className="content">
@@ -409,87 +440,150 @@ export default function App(): React.JSX.Element {
 
           {nav === 'kindle' ? (
             <section className="single-grid">
-              <form className="panel settings-form" onSubmit={(event) => {
-                event.preventDefault()
-                void saveCurrentConfig()
-              }}>
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Setup</p>
-                    <h2>Configuracao do Kindle</h2>
-                  </div>
-                  <span className={`badge ${configured ? 'ok' : 'warn'}`}>{configured ? 'Pronto' : 'Pendente'}</span>
-                </div>
+              <div className="subtabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={kindleTab === 'config'}
+                  className={`subtab ${kindleTab === 'config' ? 'active' : ''}`}
+                  onClick={() => setKindleTab('config')}
+                >
+                  Configuracao
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={kindleTab === 'diagnostico'}
+                  className={`subtab ${kindleTab === 'diagnostico' ? 'active' : ''}`}
+                  onClick={() => setKindleTab('diagnostico')}
+                >
+                  Diagnostico e Instalacao de Scripts
+                </button>
+              </div>
 
-                <div className="field-grid">
-                  <label>
-                    <span>IP do Kindle</span>
-                    <input value={form?.kindleIp ?? ''} onChange={(event) => updateForm('kindleIp', event.target.value)} placeholder="ex.: IP do Kindle" />
-                  </label>
-                  <label>
-                    <span>Porta SSH</span>
-                    <input value={form?.kindlePort ?? ''} onChange={(event) => updateForm('kindlePort', event.target.value)} inputMode="numeric" />
-                  </label>
-                  <label>
-                    <span>Usuario SSH</span>
-                    <input value={form?.kindleUser ?? ''} onChange={(event) => updateForm('kindleUser', event.target.value)} />
-                  </label>
-                  <label>
-                    <span>Senha SSH</span>
+              {kindleTab === 'config' ? (
+                <form className="panel settings-form" onSubmit={(event) => {
+                  event.preventDefault()
+                  void saveCurrentConfig()
+                }}>
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Setup</p>
+                      <h2>Configuracao do Kindle</h2>
+                    </div>
+                    <span className={`badge ${configured ? 'ok' : 'warn'}`}>{configured ? 'Pronto' : 'Pendente'}</span>
+                  </div>
+
+                  <div className="field-grid">
+                    <label>
+                      <span>IP do Kindle</span>
+                      <input value={form?.kindleIp ?? ''} onChange={(event) => updateForm('kindleIp', event.target.value)} placeholder="ex.: IP do Kindle" />
+                    </label>
+                    <label>
+                      <span>Porta SSH</span>
+                      <input value={form?.kindlePort ?? ''} onChange={(event) => updateForm('kindlePort', event.target.value)} inputMode="numeric" />
+                    </label>
+                    <label>
+                      <span>Usuario SSH</span>
+                      <input value={form?.kindleUser ?? ''} onChange={(event) => updateForm('kindleUser', event.target.value)} />
+                    </label>
+                    <label>
+                      <span>Senha SSH</span>
+                      <input
+                        value={form?.kindlePassword ?? ''}
+                        onChange={(event) => updateForm('kindlePassword', event.target.value)}
+                        placeholder={config?.kindlePasswordSaved ? 'senha salva; preencha para trocar' : 'senha do Kindle'}
+                        type="password"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="wide-field">
+                    <span>IP do PC</span>
                     <input
-                      value={form?.kindlePassword ?? ''}
-                      onChange={(event) => updateForm('kindlePassword', event.target.value)}
-                      placeholder={config?.kindlePasswordSaved ? 'senha salva; preencha para trocar' : 'senha do Kindle'}
-                      type="password"
+                      value={dashboardHostFromUrl(form?.dashboardUrl ?? '')}
+                      onChange={(event) => updateForm('dashboardUrl', dashboardUrlWithHost(form?.dashboardUrl ?? '', event.target.value))}
+                      placeholder="ex.: 192.168.0.10"
                     />
+                    <small className="field-note">URL gerada: {dashboardUrlPreview || 'aguardando'}</small>
                   </label>
-                </div>
 
-                <label className="wide-field">
-                  <span>URL do PNG para o Kindle</span>
-                  <input value={form?.dashboardUrl ?? ''} onChange={(event) => updateForm('dashboardUrl', event.target.value)} />
-                </label>
-
-                <div className="field-grid compact">
-                  <label>
-                    <span>Download Kindle</span>
-                    <input value={form?.kindleRefreshInterval ?? ''} onChange={(event) => updateForm('kindleRefreshInterval', event.target.value)} inputMode="numeric" />
-                  </label>
-                  <label>
-                    <span>Refresh completo</span>
-                    <input value={form?.kindleFullRefreshEvery ?? ''} onChange={(event) => updateForm('kindleFullRefreshEvery', event.target.value)} inputMode="numeric" />
-                  </label>
-                  <label>
-                    <span>Retry Wi-Fi</span>
-                    <input value={form?.kindleWifiRetryEvery ?? ''} onChange={(event) => updateForm('kindleWifiRetryEvery', event.target.value)} inputMode="numeric" />
-                  </label>
-                </div>
-
-                <div className="button-row">
-                  <button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
-                  <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={saving || checkingKindle || installing || uninstalling}>
-                    {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
-                  </button>
-                </div>
-
-                <div className="scripts-section">
-                  <div className="scripts-head">
-                    <p className="eyebrow">Scripts</p>
-                    <span className="scripts-hint">Instala ou remove o autostart do dashboard no Kindle.</span>
+                  <div className="field-grid compact">
+                    <label>
+                      <span>Download Kindle (segundos)</span>
+                      <input value={form?.kindleRefreshInterval ?? ''} onChange={(event) => updateForm('kindleRefreshInterval', event.target.value)} inputMode="numeric" />
+                    </label>
+                    <label>
+                      <span>Refresh completo (ciclos)</span>
+                      <input value={form?.kindleFullRefreshEvery ?? ''} onChange={(event) => updateForm('kindleFullRefreshEvery', event.target.value)} inputMode="numeric" />
+                    </label>
+                    <label>
+                      <span>Retry Wi-Fi (falhas seguidas)</span>
+                      <input value={form?.kindleWifiRetryEvery ?? ''} onChange={(event) => updateForm('kindleWifiRetryEvery', event.target.value)} inputMode="numeric" />
+                    </label>
                   </div>
+
                   <div className="button-row">
-                    <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
-                      {installing ? 'Instalando...' : 'Instalar scripts'}
-                    </button>
-                    <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
-                      {uninstalling ? 'Desinstalando...' : 'Desinstalar Script'}
+                    <button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
+                  </div>
+
+                  {message ? <div className="notice ok">{message}</div> : null}
+                  {error ? <div className="notice error">{error}</div> : null}
+                </form>
+              ) : null}
+
+              {kindleTab === 'diagnostico' ? (
+                <section className="panel diagnostics-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Kindle</p>
+                      <h2>SSH, jailbreak e scripts</h2>
+                    </div>
+                    <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={checkingKindle || saving}>
+                      {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
                     </button>
                   </div>
-                </div>
 
-                {message ? <div className="notice ok">{message}</div> : null}
-                {error ? <div className="notice error">{error}</div> : null}
-              </form>
+                  {kindle ? (
+                    <div className="status-list">
+                      <div className="status-row">
+                        <span className={`badge ${kindle.connected ? 'ok' : 'warn'}`}>{statusLabel(kindle.connected)}</span>
+                        <div>
+                          <strong>SSH {kindle.model ? `· ${kindle.model}` : ''}</strong>
+                          <p>{kindle.detail}</p>
+                        </div>
+                      </div>
+                      <div className="check-grid">
+                        <span className={kindle.jailbroken ? 'check ok' : 'check warn'}>Jailbreak</span>
+                        <span className={kindle.fbink ? 'check ok' : 'check warn'}>FBInk</span>
+                        <span className={kindle.hotfix ? 'check ok' : 'check warn'}>Hotfix</span>
+                        <span className={kindle.canInstall ? 'check ok' : 'check warn'}>Instalavel</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted">Depois do jailbreak, ative USBNetwork/KUAL e rode a verificacao por SSH.</p>
+                  )}
+
+                  <div className="scripts-section">
+                    <div className="scripts-head">
+                      <p className="eyebrow">Scripts</p>
+                      <span className="scripts-hint">Instala ou remove o autostart do dashboard no Kindle.</span>
+                    </div>
+                    <div className="button-row">
+                      <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                        {installing ? 'Instalando...' : 'Instalar scripts'}
+                      </button>
+                      <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                        {uninstalling ? 'Desinstalando...' : 'Desinstalar Script'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {installOutput ? <pre className="output-log">{installOutput}</pre> : null}
+                  {message ? <div className="notice ok">{message}</div> : null}
+                  {error ? <div className="notice error">{error}</div> : null}
+                </section>
+              ) : null}
             </section>
           ) : null}
 
@@ -534,45 +628,6 @@ export default function App(): React.JSX.Element {
             </section>
           ) : null}
 
-          {nav === 'diagnostico' ? (
-            <section className="single-grid">
-              <section className="panel diagnostics-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Kindle</p>
-                    <h2>SSH e jailbreak</h2>
-                  </div>
-                  <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={checkingKindle || saving}>
-                    {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
-                  </button>
-                </div>
-
-                {kindle ? (
-                  <div className="status-list">
-                    <div className="status-row">
-                      <span className={`badge ${kindle.connected ? 'ok' : 'warn'}`}>{statusLabel(kindle.connected)}</span>
-                      <div>
-                        <strong>SSH {kindle.model ? `· ${kindle.model}` : ''}</strong>
-                        <p>{kindle.detail}</p>
-                      </div>
-                    </div>
-                    <div className="check-grid">
-                      <span className={kindle.jailbroken ? 'check ok' : 'check warn'}>Jailbreak</span>
-                      <span className={kindle.fbink ? 'check ok' : 'check warn'}>FBInk</span>
-                      <span className={kindle.hotfix ? 'check ok' : 'check warn'}>Hotfix</span>
-                      <span className={kindle.canInstall ? 'check ok' : 'check warn'}>Instalavel</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="muted">Depois do jailbreak, ative USBNetwork/KUAL e rode a verificacao por SSH.</p>
-                )}
-
-                {installOutput ? <pre className="output-log">{installOutput}</pre> : null}
-                {message ? <div className="notice ok">{message}</div> : null}
-                {error ? <div className="notice error">{error}</div> : null}
-              </section>
-            </section>
-          ) : null}
         </main>
       </div>
     </div>

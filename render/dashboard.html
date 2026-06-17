@@ -4,12 +4,20 @@
 <meta charset="utf-8">
 <title>Dashboard Render</title>
 <script>
-  if (/[?&]desktop=1(?:&|$)/.test(location.search)) {
-    document.documentElement.className = 'desktop';
-  }
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var captureScale = Number(params.get('captureScale') || '');
+    if (captureScale > 0 && captureScale <= 1) {
+      document.documentElement.className = 'capture-landscape';
+      document.documentElement.style.setProperty('--capture-scale', String(captureScale));
+    } else if (params.get('desktop') === '1') {
+      document.documentElement.className = 'desktop';
+    }
+  })();
 </script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --capture-scale: 1; }
   html, body { width: 1072px; height: 1448px; background: #fff; color: #000; overflow: hidden; }
   body { font-family: Helvetica, Arial, sans-serif; -webkit-font-smoothing: none; }
 
@@ -28,6 +36,17 @@
     position: relative; top: auto; left: auto;
     width: 100vw; height: 100vh;
     transform: none;
+  }
+  html.capture-landscape,
+  html.capture-landscape body {
+    width: calc(1448px * var(--capture-scale));
+    height: calc(1072px * var(--capture-scale));
+  }
+  html.capture-landscape .stage {
+    position: absolute; top: 0; left: 0;
+    width: 1448px; height: 1072px;
+    transform: scale(var(--capture-scale));
+    transform-origin: top left;
   }
 
   header {

@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import type { Server } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, ipcMain, Menu, Notification, safeStorage, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, Tray } from 'electron'
 import type {
   AuthLoginTool,
   AuthSourceStatus,
@@ -77,6 +77,8 @@ const RENDER_INTERVAL_SECONDS = positiveInt(process.env.RENDER_INTERVAL, 60)
 const BASE_URL = `http://127.0.0.1:${PORT}`
 const CAPTURE_WIDTH = 1072
 const CAPTURE_HEIGHT = 1448
+const LANDSCAPE_CAPTURE_WIDTH = CAPTURE_HEIGHT
+const LANDSCAPE_CAPTURE_HEIGHT = CAPTURE_WIDTH
 
 let mainWindow: BrowserWindow | null = null
 let captureWindow: BrowserWindow | null = null
@@ -89,6 +91,12 @@ let dashboardConfig: StoredDashboardConfig | null = null
 let quitInProgress: Promise<void> | null = null
 let quitting = false
 let outputPath = ''
+
+interface CaptureViewport {
+  height: number
+  scale: number
+  width: number
+}
 
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? '', 10)
@@ -620,10 +628,48 @@ function buildTrayMenu(): Menu {
   ])
 }
 
-function createCaptureWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: CAPTURE_WIDTH,
+function captureViewport(): CaptureViewport {
+  const { height, width } = screen.getPrimaryDisplay().workAreaSize
+  const scale = Math.min(1, width / LANDSCAPE_CAPTURE_WIDTH, height / LANDSCAPE_CAPTURE_HEIGHT)
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1
+  return {
+    height: Math.max(1, Math.floor(LANDSCAPE_CAPTURE_HEIGHT * safeScale)),
+    scale: safeScale,
+    width: Math.max(1, Math.floor(LANDSCAPE_CAPTURE_WIDTH * safeScale)),
+  }
+}
+
+function rotateClockwise(image: Electron.NativeImage): Electron.NativeImage {
+  const normalized = image.resize({
+    height: LANDSCAPE_CAPTURE_HEIGHT,
+    quality: 'best',
+    width: LANDSCAPE_CAPTURE_WIDTH,
+  })
+  const bitmap = normalized.toBitmap()
+  const rotated = Buffer.alloc(bitmap.length)
+  const bytesPerPixel = 4
+
+  for (let y = 0; y < LANDSCAPE_CAPTURE_HEIGHT; y += 1) {
+    for (let x = 0; x < LANDSCAPE_CAPTURE_WIDTH; x += 1) {
+      const source = (y * LANDSCAPE_CAPTURE_WIDTH + x) * bytesPerPixel
+      const targetX = LANDSCAPE_CAPTURE_HEIGHT - 1 - y
+      const targetY = x
+      const target = (targetY * CAPTURE_WIDTH + targetX) * bytesPerPixel
+      bitmap.copy(rotated, target, source, source + bytesPerPixel)
+    }
+  }
+
+  return nativeImage.createFromBitmap(rotated, {
     height: CAPTURE_HEIGHT,
+    scaleFactor: 1,
+    width: CAPTURE_WIDTH,
+  })
+}
+
+function createCaptureWindow(viewport: CaptureViewport): BrowserWindow {
+  const window = new BrowserWindow({
+    width: viewport.width,
+    height: viewport.height,
     useContentSize: true,
     frame: false,
     show: false,
@@ -663,22 +709,27 @@ async function replaceFile(temporaryPath: string, destinationPath: string): Prom
 }
 
 async function performRender(): Promise<RenderResult> {
+  const viewport = captureViewport()
   if (!captureWindow || captureWindow.isDestroyed()) {
-    captureWindow = createCaptureWindow()
+    captureWindow = createCaptureWindow(viewport)
+  } else {
+    captureWindow.setContentSize(viewport.width, viewport.height)
   }
 
-  await captureWindow.loadURL(`${BASE_URL}/render?capture=${Date.now()}`)
+  const captureScale = viewport.scale.toFixed(6)
+  await captureWindow.loadURL(`${BASE_URL}/render?capture=${Date.now()}&captureScale=${captureScale}`)
   await waitUntilReady(captureWindow)
   const image = await captureWindow.webContents.capturePage({
     x: 0,
     y: 0,
-    width: CAPTURE_WIDTH,
-    height: CAPTURE_HEIGHT,
+    width: viewport.width,
+    height: viewport.height,
   })
+  const rotated = rotateClockwise(image)
 
   const temporaryPath = `${outputPath}.${process.pid}.tmp`
   await fs.mkdir(dirname(outputPath), { recursive: true })
-  await fs.writeFile(temporaryPath, image.toPNG())
+  await fs.writeFile(temporaryPath, rotated.toPNG())
   await replaceFile(temporaryPath, outputPath)
 
   const result = {
@@ -708,15 +759,18 @@ function scheduleRender(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle('runtime:get', async (): Promise<RuntimeInfo> => ({
-    appVersion: app.getVersion(),
-    baseUrl: BASE_URL,
-    configured: (await loadConfig()).setupComplete,
-    imageUrl: `${BASE_URL}/dash.png`,
-    lastRender: lastRenderResult,
-    outputPath,
-    renderIntervalSeconds: RENDER_INTERVAL_SECONDS,
-  }))
+  ipcMain.handle('runtime:get', async (): Promise<RuntimeInfo> => {
+    const config = await loadConfig()
+    return {
+      appVersion: app.getVersion(),
+      baseUrl: BASE_URL,
+      configured: config.setupComplete,
+      imageUrl: config.dashboardUrl,
+      lastRender: lastRenderResult,
+      outputPath,
+      renderIntervalSeconds: RENDER_INTERVAL_SECONDS,
+    }
+  })
   ipcMain.handle('config:get', async (): Promise<DashboardConfig> => publicConfig(await loadConfig()))
   ipcMain.handle('config:save', (_event, config: DashboardConfigInput) => saveConfig(config))
   ipcMain.handle('auth:check', (): AuthStatus => getAuthStatus())

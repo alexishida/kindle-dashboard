@@ -209,6 +209,12 @@ export default function App(): React.JSX.Element {
       return form.dashboardUrl
     }
   }, [form?.dashboardUrl])
+  const backendPill = useMemo(() => {
+    if (backendState === 'offline') return { className: 'offline', label: 'Backend offline' }
+    if (backendState === 'online' && !configured) return { className: 'pending', label: 'Setup pendente' }
+    if (backendState === 'online') return { className: 'online', label: 'Backend online' }
+    return { className: 'checking', label: 'Backend verificando' }
+  }, [backendState, configured])
 
   function updateForm<K extends keyof ConfigForm>(key: K, value: ConfigForm[K]): void {
     setForm((current) => current ? { ...current, [key]: value } : current)
@@ -363,13 +369,12 @@ export default function App(): React.JSX.Element {
         </nav>
 
         <div className="sidebar-foot">
-          <div className={`backend-pill ${backendState}`}>
+          <div className={`backend-pill ${backendPill.className}`}>
             <span className="status-dot" aria-hidden="true" />
-            Backend {backendState === 'online' ? 'online' : backendState === 'offline' ? 'offline' : 'verificando'}
+            {backendPill.label}
           </div>
-          <span className="foot-line">{runtime ? `Render a cada ${runtime.renderIntervalSeconds}s` : 'Preparando runtime'}</span>
           <div className="about-line">
-            <span>v{runtime?.appVersion ?? '1.0'} (build)</span>
+            <span>v{runtime?.appVersion ?? '1.0'} ({runtime?.appCommit ?? 'build'})</span>
             <span className="author-row">
               <span>Alex Ishida</span>
               <button

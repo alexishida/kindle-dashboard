@@ -1,4 +1,5 @@
 export interface RuntimeInfo {
+  appCommit: string
   appVersion: string
   baseUrl: string
   configured: boolean

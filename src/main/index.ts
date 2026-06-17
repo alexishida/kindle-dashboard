@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs'
 import type { Server } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, shell, Tray } from 'electron'
 import type {
   AuthLoginTool,
@@ -92,6 +94,9 @@ let dashboardConfig: StoredDashboardConfig | null = null
 let quitInProgress: Promise<void> | null = null
 let quitting = false
 let outputPath = ''
+let cachedAppCommit = process.env.APP_COMMIT?.trim() || process.env.GIT_COMMIT?.trim() || process.env.SOURCE_VERSION?.trim() || ''
+
+const execFileAsync = promisify(execFile)
 
 interface CaptureViewport {
   height: number
@@ -102,6 +107,22 @@ interface CaptureViewport {
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? '', 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+async function appCommitHash(): Promise<string> {
+  if (cachedAppCommit) return cachedAppCommit.slice(0, 7)
+
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      cwd: app.getAppPath(),
+      windowsHide: true,
+    })
+    cachedAppCommit = stdout.trim()
+  } catch {
+    cachedAppCommit = 'build'
+  }
+
+  return cachedAppCommit
 }
 
 function boolField(fields: Record<string, string>, key: string): boolean {
@@ -143,8 +164,6 @@ function kindleAutostartModule(): KindleAutostartModule {
 }
 
 function defaultDashboardUrl(): string {
-  if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL
-
   for (const entries of Object.values(networkInterfaces())) {
     for (const entry of entries ?? []) {
       if (entry.family === 'IPv4' && !entry.internal) {
@@ -159,12 +178,12 @@ function defaultDashboardUrl(): string {
 function defaultStoredConfig(): StoredDashboardConfig {
   return {
     dashboardUrl: defaultDashboardUrl(),
-    kindleFullRefreshEvery: positiveInt(process.env.KINDLE_FULL_REFRESH_EVERY, 20),
-    kindleIp: process.env.KINDLE_IP || '',
-    kindlePort: positiveInt(process.env.KINDLE_PORT, 22),
-    kindleRefreshInterval: positiveInt(process.env.KINDLE_REFRESH_INTERVAL, 45),
-    kindleUser: process.env.KINDLE_USER || '',
-    kindleWifiRetryEvery: positiveInt(process.env.KINDLE_WIFI_RETRY_EVERY, 3),
+    kindleFullRefreshEvery: 20,
+    kindleIp: '',
+    kindlePort: 22,
+    kindleRefreshInterval: 45,
+    kindleUser: '',
+    kindleWifiRetryEvery: 3,
     setupComplete: false,
   }
 }
@@ -781,6 +800,7 @@ function registerIpc(): void {
   ipcMain.handle('runtime:get', async (): Promise<RuntimeInfo> => {
     const config = await loadConfig()
     return {
+      appCommit: await appCommitHash(),
       appVersion: app.getVersion(),
       baseUrl: BASE_URL,
       configured: config.setupComplete,

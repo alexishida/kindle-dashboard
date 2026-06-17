@@ -24,11 +24,13 @@ function shape(u) {
   if (u.five_hour) tool.windows.push({ name: '5h', pct: u.five_hour.utilization, resets_at: u.five_hour.resets_at });
   if (u.seven_day) tool.windows.push({ name: '7d', pct: u.seven_day.utilization, resets_at: u.seven_day.resets_at });
   if (u.extra_usage && u.extra_usage.is_enabled) {
+    const spend = u.spend && u.spend.enabled ? u.spend : null;
     tool.extra = {
-      used_credits: u.extra_usage.used_credits,
-      monthly_limit: u.extra_usage.monthly_limit,
+      used_credits: spend ? spend.used.amount_minor : u.extra_usage.used_credits,
+      monthly_limit: spend ? spend.limit.amount_minor : u.extra_usage.monthly_limit,
       currency: u.extra_usage.currency,
-      pct: u.extra_usage.utilization,
+      pct: spend ? spend.percent : u.extra_usage.utilization,
+      current_balance: null,
     };
   }
   return tool;

@@ -38,7 +38,7 @@ function mockUsage() {
           { name: '5h', pct: 30.0, resets_at: '2026-06-14T21:40:00Z' },
           { name: '7d', pct: 3.0, resets_at: '2026-06-20T12:00:00Z' },
         ],
-        extra: { used_credits: 1824.0, monthly_limit: 11000, currency: 'BRL', pct: 16.58 },
+        extra: { used_credits: 3038, monthly_limit: 11000, currency: 'BRL', pct: 27.6, current_balance: 1245 },
         confidence: 'mock',
       },
       {

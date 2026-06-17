@@ -42,51 +42,18 @@ Na tela de configuracao do Electron, informe:
 O app salva a configuracao localmente no `userData` do Electron. A senha nao
 passa para o renderer como texto.
 
-## Configuracao Manual
+## Fluxo Recomendado
 
-Para usar o helper SSH:
+Use somente a UI do Electron para:
 
-```powershell
-$env:KINDLE_IP = "<IP_DO_KINDLE>"
-$env:KINDLE_PORT = "<PORTA_SSH>"
-$env:KINDLE_USER = "<USUARIO_SSH>"
-$env:KINDLE_PW = "<SENHA_SSH>"
-npm run kindle -- run "uname -a"
-```
+- salvar dados de conexao
+- validar acesso SSH
+- instalar scripts no Kindle
+- verificar status
+- remover autostart
 
-Para instalar o autostart:
-
-```powershell
-$env:DASHBOARD_URL = "http://<IP_DO_PC>:8787/dash.png"
-$env:KINDLE_REFRESH_INTERVAL = "45"
-$env:KINDLE_FULL_REFRESH_EVERY = "20"
-$env:KINDLE_WIFI_RETRY_EVERY = "3"
-npm run kindle:autostart -- install
-```
-
-Para verificar:
-
-```powershell
-npm run kindle:autostart -- status
-```
-
-Para parar temporariamente:
-
-```powershell
-npm run kindle:autostart -- stop
-```
-
-Para religar:
-
-```powershell
-npm run kindle:autostart -- start
-```
-
-Para remover o autostart:
-
-```powershell
-npm run kindle:autostart -- uninstall
-```
+Isso evita configuracao paralela por variavel de ambiente e mantem o estado do
+produto num lugar so.
 
 ## Comportamento no Kindle
 

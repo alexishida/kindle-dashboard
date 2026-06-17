@@ -135,8 +135,12 @@
     (t.windows || []).forEach(function (w) { h += bar(w.name, w.pct, w.resets_at); });
     if (t.note) h += '<div class="sub dim">⚠ ' + t.note + '</div>';
     if (t.extra) {
-      h += '<div class="sub">Extra: ' + money(t.extra.used_credits, t.extra.currency) +
-           ' / ' + money(t.extra.monthly_limit, t.extra.currency) +
+      h += '<div class="sub">Uso extra</div>';
+      if (typeof t.extra.current_balance === 'number') {
+        h += '<div class="sub">Saldo atual: ' + money(t.extra.current_balance, t.extra.currency) + '</div>';
+      }
+      h += '<div class="sub">Gasto: ' + money(t.extra.used_credits, t.extra.currency) +
+           ' · Limite mensal: ' + money(t.extra.monthly_limit, t.extra.currency) +
            '<br>(' + (Math.round(t.extra.pct * 10) / 10) + '% usado)</div>';
     }
     if (t.tokens) h += '<div class="sub">Tokens: ' + t.tokens.total.toLocaleString('pt-BR') + '</div>';

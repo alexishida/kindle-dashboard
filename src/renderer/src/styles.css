@@ -306,6 +306,11 @@ h3 {
   box-shadow: 0 0 0 3px var(--ok-bg);
 }
 
+.backend-pill.pending .status-dot {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-bg);
+}
+
 .backend-pill.offline .status-dot {
   background: var(--danger);
   box-shadow: 0 0 0 3px var(--danger-bg);

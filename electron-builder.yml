@@ -10,6 +10,7 @@ files:
   - backend/**/*
   - render/**/*
   - kindle/**/*
+  - scripts/**/*
   - package.json
 
 extraResources:

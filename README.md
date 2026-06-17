@@ -168,6 +168,28 @@ src/shared/    tipos compartilhados
 test/          testes Node
 ```
 
+### Gerar o Instalador Windows (.exe)
+
+O instalador e gerado com `electron-builder` no formato NSIS.
+
+```powershell
+npm run build:win
+```
+
+O que acontece:
+
+1. **`npm run typecheck`** — valida o TypeScript.
+2. **`electron-vite build`** — compila main, preload e renderer para `dist/`.
+3. **`electron-builder --win`** — empacota o app + dependencias num instalador `.exe` na pasta `release/`.
+
+**Pre-requisitos:**
+
+- Node.js >= 24 e dependencias instaladas (`npm install`).
+- Icone do app em `build/icon.png` (ja incluso no repositorio).
+- Windows 10/11 (o cross-build a partir de Linux/Mac nao e suportado por este projeto).
+
+O instalador gerado estara em `release/Kindle-Dashboard-<versao>-setup.exe`.
+
 ### Validacao Recomendada
 
 ```powershell

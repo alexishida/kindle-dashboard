@@ -1,6 +1,6 @@
 {
   "name": "kindle-dashboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "author": "Alex Ishida",
   "description": "Always-on AI usage dashboard rendered to a Kindle Paperwhite.",

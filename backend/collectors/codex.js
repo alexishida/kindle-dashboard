@@ -1,8 +1,8 @@
-// Coletor Codex — parse dos rollouts (validado na Fase 0.2). Sem rede.
-// Os rate_limits (5h/semanal) são globais da conta e só aparecem em ALGUNS eventos
+// Coletor Codex - parse dos rollouts (validado na Fase 0.2). Sem rede.
+// Os rate_limits (5h/semanal) sao globais da conta e so aparecem em ALGUNS eventos
 // token_count (quando a API devolve o header). Por isso varremos os rollouts do mais
-// recente para o mais antigo e pegamos o último token_count que TENHA rate_limits.
-// total_token_usage é por sessão → pegamos o do rollout mais recente.
+// recente para o mais antigo e pegamos total de tokens mais recente junto do melhor
+// rate_limit disponivel: preferimos janela ainda valida; se nao existir, caimos no stale.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -50,43 +50,55 @@ function pctWindow(rl, key, name) {
   return out;
 }
 
+function primaryResetMs(rateLimits) {
+  const resetAt = rateLimits && rateLimits.primary && rateLimits.primary.resets_at;
+  return resetAt ? resetAt * 1000 : null;
+}
+
 async function collect() {
   try {
     const files = rolloutsByRecency();
     if (!files.length) throw new Error('nenhum rollout encontrado');
 
-    let rateLimits = null;
+    let liveRateLimits = null;
+    let staleRateLimits = null;
     let totalTokens = null;
-    // varre do mais recente; para nos dois assim que achar cada um
+    const now = Date.now();
+
+    // varre do mais recente; para cedo se ja tivermos tokens + limite vivo
     for (const f of files) {
       for (const tc of tokenCountsDesc(f)) {
         if (!totalTokens && tc.info && tc.info.total_token_usage) {
           totalTokens = tc.info.total_token_usage.total_tokens;
         }
-        if (!rateLimits && tc.rate_limits && (tc.rate_limits.primary || tc.rate_limits.secondary)) {
-          rateLimits = tc.rate_limits;
+        if (tc.rate_limits && (tc.rate_limits.primary || tc.rate_limits.secondary)) {
+          const reset5h = primaryResetMs(tc.rate_limits);
+          if (!liveRateLimits && reset5h && reset5h > now) {
+            liveRateLimits = tc.rate_limits;
+          } else if (!staleRateLimits) {
+            staleRateLimits = tc.rate_limits;
+          }
         }
-        if (rateLimits && totalTokens != null) break;
+        if (liveRateLimits && totalTokens != null) break;
       }
-      if (rateLimits && totalTokens != null) break;
+      if (liveRateLimits && totalTokens != null) break;
     }
-    if (!rateLimits && totalTokens == null) throw new Error('sem token_count utilizável');
+
+    const rateLimits = liveRateLimits || staleRateLimits;
+    if (!rateLimits && totalTokens == null) throw new Error('sem token_count utilizavel');
 
     const tool = { tool: 'codex', label: 'OpenAI Codex', windows: [], confidence: 'live' };
     if (totalTokens != null) tool.tokens = { total: totalTokens };
 
-    // Honestidade: o rate_limit local só vale enquanto a janela não resetou. Se o
-    // reset_at da janela 5h já passou, o dado é velho (Codex foi usado pela web/app,
-    // não pelo CLI) — não mostrar % expirado como se fosse atual.
-    const now = Date.now();
-    const reset5h = rateLimits && rateLimits.primary && rateLimits.primary.resets_at * 1000;
+    // Honestidade: rate_limit local so vale enquanto janela nao resetou. Se reset_at
+    // da janela 5h ja passou, dado ficou velho (Codex usado pela web/app, nao pelo CLI).
+    const reset5h = primaryResetMs(rateLimits);
     if (rateLimits && reset5h && reset5h > now) {
       const w5 = pctWindow(rateLimits, 'primary', '5h');
       const w7 = pctWindow(rateLimits, 'secondary', '7d');
       if (w5) tool.windows.push(w5);
       if (w7) tool.windows.push(w7);
     } else if (rateLimits) {
-      // dado existe mas a janela expirou → marca como obsoleto
       tool.confidence = 'stale';
       tool.staleSince = reset5h ? new Date(reset5h).toISOString() : null;
       tool.note = 'limites locais desatualizados (Codex usado fora do CLI)';

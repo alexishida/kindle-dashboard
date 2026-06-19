@@ -200,3 +200,8 @@ npm run typecheck
 ```
 
 Use `npm run build` antes de gerar instalador ou publicar uma versao.
+
+### Changelog
+
+- Historico de mudancas: [CHANGELOG.md](CHANGELOG.md)
+- Releases publicas: [GitHub Releases](https://github.com/alexishida/kindle-dashboard/releases)

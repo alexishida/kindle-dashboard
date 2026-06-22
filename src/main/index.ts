@@ -13,6 +13,7 @@ import type {
   DashboardConfig,
   DashboardConfigInput,
   KindleInstallResult,
+  KindleScriptStatus,
   KindleStatus,
   RenderResult,
   RuntimeInfo,
@@ -50,7 +51,7 @@ interface KindleAutostartModule {
   runAction: (
     action: 'install' | 'status' | 'start' | 'stop' | 'uninstall',
     options: { env: Record<string, string>, ssh: SshOptions },
-  ) => Promise<{ code: number, output: string }>
+  ) => Promise<{ code: number, output: string, status: KindleScriptStatus }>
 }
 
 interface SshOptions {
@@ -447,6 +448,7 @@ async function installKindle(): Promise<KindleInstallResult> {
   return {
     config: publicConfig(next),
     output: result.output,
+    status: result.status,
   }
 }
 
@@ -466,7 +468,18 @@ async function uninstallKindle(): Promise<KindleInstallResult> {
   return {
     config: publicConfig(next),
     output: result.output,
+    status: result.status,
   }
+}
+
+async function manageKindleScript(action: 'status' | 'start' | 'stop'): Promise<KindleScriptStatus> {
+  const config = await loadConfig()
+  const result = await kindleAutostartModule().runAction(action, {
+    env: kindleEnvironment(config),
+    ssh: sshOptions(config),
+  })
+  if (result.code !== 0) throw new Error(result.output || `Kindle script action failed with exit ${result.code}`)
+  return result.status
 }
 
 function loginScript(tool: AuthLoginTool): string {
@@ -817,6 +830,9 @@ function registerIpc(): void {
   ipcMain.handle('app:openRepo', () => shell.openExternal(REPO_URL))
   ipcMain.handle('kindle:check', (): Promise<KindleStatus> => checkKindle())
   ipcMain.handle('kindle:install', (): Promise<KindleInstallResult> => installKindle())
+  ipcMain.handle('kindle:script-status', (): Promise<KindleScriptStatus> => manageKindleScript('status'))
+  ipcMain.handle('kindle:script-start', (): Promise<KindleScriptStatus> => manageKindleScript('start'))
+  ipcMain.handle('kindle:script-stop', (): Promise<KindleScriptStatus> => manageKindleScript('stop'))
   ipcMain.handle('kindle:uninstall', (): Promise<KindleInstallResult> => uninstallKindle())
   ipcMain.handle('render:now', () => renderDashboard())
   ipcMain.handle('app:quit', () => {

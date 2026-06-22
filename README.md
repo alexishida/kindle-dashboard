@@ -83,6 +83,8 @@ mesmo depois de reiniciar.
 
 - O painel principal (**Painel**) mostra a pre-visualizacao da imagem atual e
   um botao **Atualizar agora** para forcar um novo render.
+- Em **Kindle > Diagnostico**, use **Iniciar script** e **Parar script** para
+  controlar o loop no aparelho sem remover o autostart.
 - O app fica no tray do Windows. Clique no icone para reabrir a janela; o
   menu do tray tem **Abrir configuracoes** e **Encerrar**.
 - Para o app iniciar automaticamente com o Windows, use os scripts de

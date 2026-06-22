@@ -198,6 +198,22 @@ fi
 `, 'read dashboard status');
 }
 
+function parseStatus(output) {
+  const fields = {};
+  for (const line of output.split(/\r?\n/)) {
+    const separator = line.indexOf(':');
+    if (separator > 0) fields[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+  }
+
+  return {
+    backendReachable: fields.Backend === 'reachable',
+    enabled: fields.Enabled === 'yes',
+    installed: fields.Autostart === 'installed',
+    output,
+    running: /^running(?:\s|$)/.test(fields.Loop || ''),
+  };
+}
+
 function printUsage() {
   console.error('Usage: node scripts/kindle-autostart.js <install|status|start|stop|uninstall>');
 }
@@ -216,7 +232,7 @@ async function runAction(action, options = {}) {
     else if (action === 'uninstall') await uninstall(client);
 
     const output = await status(client);
-    return { code: 0, output };
+    return { code: 0, output, status: parseStatus(output) };
   } finally {
     client.end();
   }
@@ -250,6 +266,7 @@ module.exports = {
   environmentContents,
   install,
   main,
+  parseStatus,
   positiveInt,
   preflight,
   runAction,

@@ -67,17 +67,29 @@ export interface KindleStatus {
   model: string | null
 }
 
+export interface KindleScriptStatus {
+  backendReachable: boolean
+  enabled: boolean
+  installed: boolean
+  output: string
+  running: boolean
+}
+
 export interface KindleInstallResult {
   config: DashboardConfig
   output: string
+  status: KindleScriptStatus
 }
 
 export interface DashboardApi {
   checkAuth: () => Promise<AuthStatus>
   checkKindle: () => Promise<KindleStatus>
+  getKindleScriptStatus: () => Promise<KindleScriptStatus>
   getRuntimeInfo: () => Promise<RuntimeInfo>
   getConfig: () => Promise<DashboardConfig>
   installKindle: () => Promise<KindleInstallResult>
+  startKindleScript: () => Promise<KindleScriptStatus>
+  stopKindleScript: () => Promise<KindleScriptStatus>
   uninstallKindle: () => Promise<KindleInstallResult>
   openLogin: (tool: AuthLoginTool) => Promise<void>
   openRepo: () => Promise<void>

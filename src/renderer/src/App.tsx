@@ -7,6 +7,7 @@ import type {
   DashboardConfig,
   DashboardConfigInput,
   KindleStatus,
+  KindleScriptStatus,
   RenderResult,
   RuntimeInfo,
 } from '../../shared/types'
@@ -14,6 +15,7 @@ import type {
 type BackendState = 'checking' | 'online' | 'offline'
 type NavKey = 'painel' | 'kindle' | 'logins'
 type KindleTab = 'config' | 'diagnostico'
+type KindleScriptAction = 'start' | 'stop'
 
 interface NavItem {
   key: NavKey
@@ -113,6 +115,7 @@ export default function App(): React.JSX.Element {
   const [form, setForm] = useState<ConfigForm | null>(null)
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [kindle, setKindle] = useState<KindleStatus | null>(null)
+  const [kindleScript, setKindleScript] = useState<KindleScriptStatus | null>(null)
   const [backendState, setBackendState] = useState<BackendState>('checking')
   const [lastRender, setLastRender] = useState<string | null>(null)
   const [nav, setNav] = useState<NavKey>('kindle')
@@ -123,6 +126,7 @@ export default function App(): React.JSX.Element {
   const [checkingKindle, setCheckingKindle] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [uninstalling, setUninstalling] = useState(false)
+  const [scriptAction, setScriptAction] = useState<KindleScriptAction | null>(null)
   const [previewKey, setPreviewKey] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -251,6 +255,11 @@ export default function App(): React.JSX.Element {
       const status = await window.dashboard.checkKindle()
       setKindle(status)
       setMessage(status.detail)
+      if (status.connected) {
+        const scriptStatus = await window.dashboard.getKindleScriptStatus()
+        setKindleScript(scriptStatus)
+        setInstallOutput(scriptStatus.output)
+      }
       setNav('kindle')
       setKindleTab('diagnostico')
     } catch (kindleError) {
@@ -273,6 +282,7 @@ export default function App(): React.JSX.Element {
       setConfig(result.config)
       setForm(formFromConfig(result.config))
       setInstallOutput(result.output)
+      setKindleScript(result.status)
       setMessage('Scripts instalados no Kindle')
       setNav('painel')
       await refreshAuth()
@@ -301,11 +311,30 @@ export default function App(): React.JSX.Element {
       setConfig(result.config)
       setForm(formFromConfig(result.config))
       setInstallOutput(result.output)
+      setKindleScript(result.status)
       setMessage('Scripts desinstalados do Kindle')
     } catch (uninstallError) {
       setError(uninstallError instanceof Error ? uninstallError.message : String(uninstallError))
     } finally {
       setUninstalling(false)
+    }
+  }
+
+  async function handleKindleScript(action: 'start' | 'stop'): Promise<void> {
+    setScriptAction(action)
+    setError(null)
+    setMessage(null)
+    try {
+      const status = action === 'start'
+        ? await window.dashboard.startKindleScript()
+        : await window.dashboard.stopKindleScript()
+      setKindleScript(status)
+      setInstallOutput(status.output)
+      setMessage(action === 'start' ? 'Script iniciado no Kindle' : 'Script parado no Kindle')
+    } catch (scriptError) {
+      setError(scriptError instanceof Error ? scriptError.message : String(scriptError))
+    } finally {
+      setScriptAction(null)
     }
   }
 
@@ -575,11 +604,39 @@ export default function App(): React.JSX.Element {
                       <span className="scripts-hint">Instala ou remove o autostart do dashboard no Kindle.</span>
                     </div>
                     <div className="button-row">
-                      <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                      <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
                         {installing ? 'Instalando...' : 'Instalar scripts'}
                       </button>
-                      <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle}>
+                      <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
                         {uninstalling ? 'Desinstalando...' : 'Desinstalar Script'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="scripts-section">
+                    <div className="scripts-head">
+                      <p className="eyebrow">Execucao</p>
+                      <span className="scripts-hint">
+                        {kindleScript
+                          ? `${kindleScript.running ? 'Rodando' : 'Parado'} · ${kindleScript.enabled ? 'autostart ativo' : 'autostart inativo'} · backend ${kindleScript.backendReachable ? 'acessivel' : 'indisponivel'}`
+                          : 'Verifique o Kindle para consultar o estado do script.'}
+                      </span>
+                    </div>
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        onClick={() => void handleKindleScript('start')}
+                        disabled={!kindleScript?.installed || kindleScript.running || scriptAction !== null || installing || uninstalling || checkingKindle}
+                      >
+                        {scriptAction === 'start' ? 'Iniciando...' : 'Iniciar script'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => void handleKindleScript('stop')}
+                        disabled={!kindleScript?.running || scriptAction !== null || installing || uninstalling || checkingKindle}
+                      >
+                        {scriptAction === 'stop' ? 'Parando...' : 'Parar script'}
                       </button>
                     </div>
                   </div>

@@ -4,9 +4,12 @@ import type { AuthLoginTool, DashboardApi, DashboardConfigInput, RenderResult } 
 const api: DashboardApi = {
   checkAuth: () => ipcRenderer.invoke('auth:check'),
   checkKindle: () => ipcRenderer.invoke('kindle:check'),
+  getKindleScriptStatus: () => ipcRenderer.invoke('kindle:script-status'),
   getRuntimeInfo: () => ipcRenderer.invoke('runtime:get'),
   getConfig: () => ipcRenderer.invoke('config:get'),
   installKindle: () => ipcRenderer.invoke('kindle:install'),
+  startKindleScript: () => ipcRenderer.invoke('kindle:script-start'),
+  stopKindleScript: () => ipcRenderer.invoke('kindle:script-stop'),
   uninstallKindle: () => ipcRenderer.invoke('kindle:uninstall'),
   openLogin: (tool: AuthLoginTool) => ipcRenderer.invoke('auth:openLogin', tool),
   openRepo: () => ipcRenderer.invoke('app:openRepo'),

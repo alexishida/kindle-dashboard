@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const {
   dashboardUrl,
   environmentContents,
+  parseStatus,
   positiveInt,
 } = require('../scripts/kindle-autostart');
 
@@ -33,4 +34,37 @@ test('environmentContents safely quotes the generated Kindle configuration', () 
   assert.match(contents, /^INTERVAL='30'$/m);
   assert.match(contents, /^FULL_EVERY='10'$/m);
   assert.match(contents, /^WIFI_RETRY_EVERY='4'$/m);
+});
+
+test('parseStatus returns public state from Kindle status output', () => {
+  const output = [
+    'Autostart : installed',
+    'Enabled   : yes',
+    'Upstart   : kindle-dashboard stop/waiting',
+    'Loop      : running (pid 123)',
+    'Backend   : reachable',
+  ].join('\n');
+
+  assert.deepEqual(parseStatus(output), {
+    backendReachable: true,
+    enabled: true,
+    installed: true,
+    output,
+    running: true,
+  });
+});
+
+test('parseStatus reports stopped and unavailable scripts', () => {
+  const output = [
+    'Autostart : not installed',
+    'Enabled   : n/a',
+    'Loop      : stopped',
+    'Backend   : unavailable',
+  ].join('\n');
+
+  const status = parseStatus(output);
+  assert.equal(status.installed, false);
+  assert.equal(status.enabled, false);
+  assert.equal(status.running, false);
+  assert.equal(status.backendReachable, false);
 });

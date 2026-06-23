@@ -4,7 +4,7 @@ Desktop dashboard for tracking AI tool usage and displaying an always-fresh
 image on a jailbroken Kindle Paperwhite.
 
 The app runs on the PC via Electron, collects local data, renders a high
-contrast PNG, and serves it at `http://<IP_DO_PC>:8787/dash.png`. The Kindle
+contrast PNG, and serves it at `http://<IP_PC>:8787/dash.png`. The Kindle
 downloads that image on the local network and draws it on screen with FBInk.
 
 This project does not jailbreak the Kindle. It assumes the device is already
@@ -84,11 +84,11 @@ Open **Kindle > Configuration** and fill in:
 
 | Field | Expected value |
 | --- | --- |
-| Kindle IP | `<IP_DO_KINDLE>` |
+| Kindle IP | `<KINDLE_IP>` |
 | SSH Port | Usually `22` |
-| SSH User | `<USUARIO_SSH>` |
-| SSH Password | `<SENHA_SSH>` |
-| PC IP | `<IP_DO_PC>` |
+| SSH User | `<SSH_USER>` |
+| SSH Password | `<SSH_PASSWORD>` |
+| PC IP | `<PC_IP>` |
 | Kindle Download | Interval, in seconds, between PNG downloads |
 | Full Refresh | How many cycles between full Kindle refreshes |
 | Wi-Fi Retry | How many consecutive failures before Wi-Fi recovery |
@@ -225,11 +225,6 @@ npm run typecheck
 npm run build
 ```
 
-Before publishing a release, also check that examples still use placeholders:
-
-```powershell
-rg -n "<IP_DO_PC>|<IP_DO_KINDLE>|<USUARIO_SSH>|<SENHA_SSH>" README.md KINDLE-INSTALLATION.md
-```
 
 ## Links
 

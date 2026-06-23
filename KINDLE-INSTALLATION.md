@@ -12,7 +12,7 @@ registers a reversible startup job.
 The PC renders `dash.png` and serves it at:
 
 ```text
-http://<IP_DO_PC>:8787/dash.png
+http://<IP_PC>:8787/dash.png
 ```
 
 The Kindle runs a local loop that:
@@ -47,11 +47,11 @@ Open **Kindle > Configuration** in the app and fill in:
 
 | Field | Value |
 | --- | --- |
-| Kindle IP | `<IP_DO_KINDLE>` |
+| Kindle IP | `<IP_KINDLE>` |
 | SSH Port | usually `22` |
-| SSH User | `<USUARIO_SSH>` |
-| SSH Password | `<SENHA_SSH>` |
-| PC IP | `<IP_DO_PC>` |
+| SSH User | `<SSH_USER>` |
+| SSH Password | `<SSH_PASSWORD>` |
+| PC IP | `<IP_PC>` |
 | Kindle Download | seconds between PNG downloads |
 | Full Refresh | cycles between full anti-ghosting refreshes |
 | Wi-Fi Retry | consecutive failures before Wi-Fi recovery |
@@ -59,7 +59,7 @@ Open **Kindle > Configuration** in the app and fill in:
 The UI builds the final PNG URL as:
 
 ```text
-http://<IP_DO_PC>:8787/dash.png
+http://<IP_PC>:8787/dash.png
 ```
 
 The SSH password is saved locally in Electron `userData` and uses `safeStorage`
@@ -104,7 +104,7 @@ to `ro`.
 `/mnt/us/dash-autostart.env` contains the configuration used by the launcher:
 
 ```sh
-PC='http://<IP_DO_PC>:8787/dash.png'
+PC='http://<IP_PC>:8787/dash.png'
 INTERVAL='45'
 FULL_EVERY='20'
 WIFI_RETRY_EVERY='3'
@@ -171,7 +171,7 @@ If `Backend` is unavailable, check:
 - PC and Kindle are on the same network;
 - app is open or running in the background;
 - port `8787` is allowed by the firewall;
-- URL `http://<IP_DO_PC>:8787/dash.png` is reachable from the Kindle;
+- URL `http://<IP_PC>:8787/dash.png` is reachable from the Kindle;
 - PC IP is up to date in configuration.
 
 ## Start and Stop Without Uninstalling
@@ -235,7 +235,7 @@ Do not put these in this file:
 
 Always use placeholders:
 
-- `<IP_DO_PC>`
-- `<IP_DO_KINDLE>`
-- `<USUARIO_SSH>`
-- `<SENHA_SSH>`
+- `<IP_PC>`
+- `<IP_KINDLE>`
+- `<SSH_USER>`
+- `<SSH_PASSWORD>`

@@ -223,23 +223,17 @@ h3 {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   border-radius: 11px;
   background: linear-gradient(140deg, var(--accent), #8a6bff);
   color: #0b1220;
-  font-size: 20px;
-  font-weight: 900;
 }
 
-.brand-eyebrow {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.brand-mark svg {
+  width: 20px;
+  height: 20px;
 }
 
 .brand-title {

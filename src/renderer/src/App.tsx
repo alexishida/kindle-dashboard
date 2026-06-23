@@ -127,8 +127,7 @@ const COPY: Record<SupportedLanguage, Record<string, string>> = {
     menuSettings: 'Settings',
     openSettingsTitle: 'Settings',
     ok: 'OK',
-    panelBrandEyebrow: 'Kindle Paperwhite',
-    panelBrandTitle: 'Dashboard',
+    panelBrandTitle: 'Kindle Dashboard',
     refreshNow: 'Refresh now',
     refreshNowBusy: 'Refreshing...',
     reqFbink: 'Shows image on screen',
@@ -229,8 +228,7 @@ const COPY: Record<SupportedLanguage, Record<string, string>> = {
     menuSettings: 'Configurações',
     openSettingsTitle: 'Configurações',
     ok: 'OK',
-    panelBrandEyebrow: 'Kindle Paperwhite',
-    panelBrandTitle: 'Dashboard',
+    panelBrandTitle: 'Kindle Dashboard',
     refreshNow: 'Atualizar agora',
     refreshNowBusy: 'Atualizando...',
     reqFbink: 'Mostra a imagem na tela',
@@ -331,8 +329,7 @@ const COPY: Record<SupportedLanguage, Record<string, string>> = {
     menuSettings: 'Configuración',
     openSettingsTitle: 'Configuración',
     ok: 'OK',
-    panelBrandEyebrow: 'Kindle Paperwhite',
-    panelBrandTitle: 'Dashboard',
+    panelBrandTitle: 'Kindle Dashboard',
     refreshNow: 'Actualizar ahora',
     refreshNowBusy: 'Actualizando...',
     reqFbink: 'Muestra imagen en pantalla',
@@ -910,11 +907,8 @@ export default function App(): React.JSX.Element {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <p className="brand-eyebrow">{t('panelBrandEyebrow')}</p>
-            <strong className="brand-title">{t('panelBrandTitle')}</strong>
-          </div>
+          <span className="brand-mark" aria-hidden="true"><Icon name="book" /></span>
+          <strong className="brand-title">{t('panelBrandTitle')}</strong>
         </div>
 
         <nav className="nav">

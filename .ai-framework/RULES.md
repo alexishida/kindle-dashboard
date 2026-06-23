@@ -98,6 +98,8 @@ Este arquivo e a fonte oficial de regras para o Kindle Dashboard.
 - A UI Electron deve ser operacional, nao landing page.
 - Primeira tela deve permitir configurar, verificar, instalar, revisar auth e
   ver erros.
+- Todo botao visivel na UI deve ter icone junto do rotulo, inclusive acoes
+  primarias, secundarias e abas clicaveis.
 - Tray do Windows deve oferecer abrir painel, abrir configuracoes, atualizar e
   encerrar.
 - Para e-ink, priorizar alto contraste, poucos tons, texto grande e hierarquia

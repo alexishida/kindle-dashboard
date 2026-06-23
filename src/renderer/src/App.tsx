@@ -6,8 +6,8 @@ import type {
   AuthStatus,
   DashboardConfig,
   DashboardConfigInput,
-  KindleStatus,
   KindleScriptStatus,
+  KindleStatus,
   RenderResult,
   RuntimeInfo,
 } from '../../shared/types'
@@ -16,18 +16,32 @@ type BackendState = 'checking' | 'online' | 'offline'
 type NavKey = 'painel' | 'kindle' | 'logins'
 type KindleTab = 'config' | 'diagnostico'
 type KindleScriptAction = 'start' | 'stop'
+type IconName =
+  | 'book'
+  | 'kindle'
+  | 'login'
+  | 'refresh'
+  | 'settings'
+  | 'stethoscope'
+  | 'save'
+  | 'download'
+  | 'trash'
+  | 'play'
+  | 'stop'
+  | 'search'
+  | 'github'
 
 interface NavItem {
   key: NavKey
   label: string
   hint: string
-  icon: string
+  icon: IconName
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'painel', label: 'Painel', hint: 'Previa e estado', icon: '▦' },
-  { key: 'kindle', label: 'Kindle', hint: 'Conexao e scripts', icon: '⚙' },
-  { key: 'logins', label: 'Logins', hint: 'Auth das fontes', icon: '◉' },
+  { key: 'painel', label: 'Painel', hint: 'Prévia e estado', icon: 'book' },
+  { key: 'kindle', label: 'Kindle', hint: 'Conexão e scripts', icon: 'kindle' },
+  { key: 'logins', label: 'Logins', hint: 'Autenticação das fontes', icon: 'login' },
 ]
 
 interface ConfigForm {
@@ -39,6 +53,11 @@ interface ConfigForm {
   kindleRefreshInterval: string
   kindleUser: string
   kindleWifiRetryEvery: string
+}
+
+interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  icon: IconName
+  iconOnly?: boolean
 }
 
 function formatTime(value: string | null): string {
@@ -85,7 +104,7 @@ function sourceAction(source: AuthSourceStatus): AuthLoginTool | null {
 }
 
 function statusLabel(ok: boolean): string {
-  return ok ? 'OK' : 'Acao'
+  return ok ? 'OK' : 'Ação'
 }
 
 function dashboardHostFromUrl(value: string): string {
@@ -107,6 +126,164 @@ function dashboardUrlWithHost(currentUrl: string, host: string): string {
   } catch {
     return `http://${trimmedHost}:8787/dash.png`
   }
+}
+
+function ReqChip({ ok, label, desc }: { ok: boolean; label: string; desc: string }): React.JSX.Element {
+  return (
+    <div className={`req-chip ${ok ? 'ok' : 'bad'}`}>
+      <span className="req-icon" aria-hidden="true">{ok ? '✓' : '✕'}</span>
+      <span className="req-body">
+        <span className="req-label">{label}</span>
+        <span className="req-desc">{desc}</span>
+      </span>
+    </div>
+  )
+}
+
+function ExecPill({ ok, label, value }: { ok: boolean; label: string; value: string }): React.JSX.Element {
+  return (
+    <div className={`exec-pill ${ok ? 'ok' : 'bad'}`}>
+      <span className="exec-dot" aria-hidden="true" />
+      <span className="exec-label">{label}</span>
+      <span className="exec-value">{value}</span>
+    </div>
+  )
+}
+
+function Icon({ name }: { name: IconName }): React.JSX.Element {
+  const common = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 1.8,
+    viewBox: '0 0 24 24',
+  }
+
+  switch (name) {
+    case 'book':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21Z" />
+          <path d="M5 5.5V21" />
+          <path d="M9 7h6" />
+          <path d="M9 11h6" />
+        </svg>
+      )
+    case 'kindle':
+      return (
+        <svg {...common} aria-hidden="true">
+          <rect x="7" y="2.5" width="10" height="19" rx="2.2" />
+          <path d="M10 6.5h4" />
+          <path d="M9.5 17h5" />
+        </svg>
+      )
+    case 'login':
+      return (
+        <svg {...common} aria-hidden="true">
+          <circle cx="12" cy="8" r="3.2" />
+          <path d="M5.5 19a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      )
+    case 'refresh':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M20 6v5h-5" />
+          <path d="M4 18v-5h5" />
+          <path d="M7.5 8A7 7 0 0 1 20 11" />
+          <path d="M16.5 16A7 7 0 0 1 4 13" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5A3.5 3.5 0 1 0 12 8.5Z" />
+          <path d="M19 12a7.4 7.4 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7.6 7.6 0 0 0-1.8-1L14.5 3h-5l-.2 2.9a7.6 7.6 0 0 0-1.8 1l-2.4-1-2 3.5 2 1.5a7.4 7.4 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7.6 7.6 0 0 0 1.8 1l.2 2.9h5l.2-2.9a7.6 7.6 0 0 0 1.8-1l2.4 1 2-3.5-2-1.5c.1-.3.1-.7.1-1Z" />
+        </svg>
+      )
+    case 'stethoscope':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M8 4v5a4 4 0 0 0 8 0V4" />
+          <path d="M8 4H6" />
+          <path d="M16 4h2" />
+          <path d="M12 13v3a4 4 0 0 0 8 0a2 2 0 1 0-4 0" />
+        </svg>
+      )
+    case 'save':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M5 4h11l3 3v13H5Z" />
+          <path d="M8 4v5h7V4" />
+          <path d="M8 20v-6h8v6" />
+        </svg>
+      )
+    case 'download':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M12 4v10" />
+          <path d="m8 10 4 4 4-4" />
+          <path d="M5 19h14" />
+        </svg>
+      )
+    case 'trash':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="M4 7h16" />
+          <path d="M9 3h6" />
+          <path d="M7 7l1 13h8l1-13" />
+          <path d="M10 11v5" />
+          <path d="M14 11v5" />
+        </svg>
+      )
+    case 'play':
+      return (
+        <svg {...common} aria-hidden="true">
+          <path d="m8 5 10 7-10 7Z" fill="currentColor" stroke="none" />
+        </svg>
+      )
+    case 'stop':
+      return (
+        <svg {...common} aria-hidden="true">
+          <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none" />
+        </svg>
+      )
+    case 'search':
+      return (
+        <svg {...common} aria-hidden="true">
+          <circle cx="11" cy="11" r="5.5" />
+          <path d="m16 16 4 4" />
+        </svg>
+      )
+    case 'github':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+        </svg>
+      )
+  }
+}
+
+function ActionButton({
+  children,
+  className,
+  icon,
+  iconOnly = false,
+  type = 'button',
+  ...props
+}: ActionButtonProps): React.JSX.Element {
+  return (
+    <button
+      type={type}
+      className={`ui-button ${iconOnly ? 'icon-only' : ''} ${className ?? ''}`.trim()}
+      {...props}
+    >
+      <span className="button-icon" aria-hidden="true">
+        <Icon name={icon} />
+      </span>
+      {children ? <span className="button-label">{children}</span> : null}
+    </button>
+  )
 }
 
 export default function App(): React.JSX.Element {
@@ -217,7 +394,7 @@ export default function App(): React.JSX.Element {
     if (backendState === 'offline') return { className: 'offline', label: 'Backend offline' }
     if (backendState === 'online' && !configured) return { className: 'pending', label: 'Setup pendente' }
     if (backendState === 'online') return { className: 'online', label: 'Backend online' }
-    return { className: 'checking', label: 'Backend verificando' }
+    return { className: 'checking', label: 'Verificando backend' }
   }, [backendState, configured])
 
   function updateForm<K extends keyof ConfigForm>(key: K, value: ConfigForm[K]): void {
@@ -234,7 +411,7 @@ export default function App(): React.JSX.Element {
       const saved = await window.dashboard.saveConfig(inputFromForm(form))
       setConfig(saved)
       setForm(formFromConfig(saved))
-      setMessage('Configuracao salva')
+      setMessage('Configuração salva')
       return saved
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError))
@@ -295,7 +472,7 @@ export default function App(): React.JSX.Element {
 
   async function handleUninstallKindle(): Promise<void> {
     const confirmed = window.confirm(
-      'Desinstalar os scripts do Kindle? O autostart do dashboard sera removido do aparelho.',
+      'Desinstalar os scripts do Kindle? O autostart do dashboard será removido do aparelho.',
     )
     if (!confirmed) return
 
@@ -387,7 +564,7 @@ export default function App(): React.JSX.Element {
                 disabled={locked}
                 title={locked ? 'Configure o Kindle primeiro' : item.hint}
               >
-                <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                <span className="nav-icon" aria-hidden="true"><Icon name={item.icon} /></span>
                 <span className="nav-text">
                   <span className="nav-label">{item.label}</span>
                   <span className="nav-hint">{item.hint}</span>
@@ -406,26 +583,14 @@ export default function App(): React.JSX.Element {
             <span>v{runtime?.appVersion ?? '1.0'} ({runtime?.appCommit ?? 'build'})</span>
             <span className="author-row">
               <span>Alex Ishida</span>
-              <button
-                type="button"
+              <ActionButton
                 className="icon-link"
-                title="Abrir repositorio no GitHub"
-                aria-label="Abrir repositorio no GitHub"
+                title="Abrir repositório no GitHub"
+                aria-label="Abrir repositório no GitHub"
                 onClick={() => void window.dashboard.openRepo()}
-              >
-                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
-                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
-                    0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
-                    -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
-                    .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
-                    0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82
-                    a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27
-                    1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15
-                    0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
-                    0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8
-                    c0-4.42-3.58-8-8-8Z" />
-                </svg>
-              </button>
+                icon="github"
+                iconOnly
+              />
             </span>
           </div>
         </div>
@@ -442,15 +607,15 @@ export default function App(): React.JSX.Element {
             <>
               <div className="topbar-meta">
                 <span className="meta-item">
-                  <span className="meta-key">Ultima imagem</span>
+                  <span className="meta-key">Última imagem</span>
                   <span className="meta-val">{formatTime(lastRender)}</span>
                 </span>
               </div>
 
               <div className="actions">
-                <button type="button" onClick={() => void handleRender()} disabled={rendering || !runtime}>
+                <ActionButton icon="refresh" onClick={() => void handleRender()} disabled={rendering || !runtime}>
                   {rendering ? 'Atualizando...' : 'Atualizar agora'}
-                </button>
+                </ActionButton>
               </div>
             </>
           ) : null}
@@ -475,24 +640,24 @@ export default function App(): React.JSX.Element {
           {nav === 'kindle' ? (
             <section className="single-grid">
               <div className="subtabs" role="tablist">
-                <button
-                  type="button"
+                <ActionButton
                   role="tab"
                   aria-selected={kindleTab === 'config'}
                   className={`subtab ${kindleTab === 'config' ? 'active' : ''}`}
                   onClick={() => setKindleTab('config')}
+                  icon="settings"
                 >
-                  Configuracao
-                </button>
-                <button
-                  type="button"
+                  Configuração
+                </ActionButton>
+                <ActionButton
                   role="tab"
                   aria-selected={kindleTab === 'diagnostico'}
                   className={`subtab ${kindleTab === 'diagnostico' ? 'active' : ''}`}
                   onClick={() => setKindleTab('diagnostico')}
+                  icon="stethoscope"
                 >
-                  Diagnostico e Instalacao de Scripts
-                </button>
+                  Diagnóstico e Instalação de Scripts
+                </ActionButton>
               </div>
 
               {kindleTab === 'config' ? (
@@ -503,7 +668,7 @@ export default function App(): React.JSX.Element {
                   <div className="panel-heading">
                     <div>
                       <p className="eyebrow">Setup</p>
-                      <h2>Configuracao do Kindle</h2>
+                      <h2>Configuração do Kindle</h2>
                     </div>
                     <span className={`badge ${configured ? 'ok' : 'warn'}`}>{configured ? 'Pronto' : 'Pendente'}</span>
                   </div>
@@ -518,7 +683,7 @@ export default function App(): React.JSX.Element {
                       <input value={form?.kindlePort ?? ''} onChange={(event) => updateForm('kindlePort', event.target.value)} inputMode="numeric" />
                     </label>
                     <label>
-                      <span>Usuario SSH</span>
+                      <span>Usuário SSH</span>
                       <input value={form?.kindleUser ?? ''} onChange={(event) => updateForm('kindleUser', event.target.value)} />
                     </label>
                     <label>
@@ -558,7 +723,7 @@ export default function App(): React.JSX.Element {
                   </div>
 
                   <div className="button-row">
-                    <button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
+                    <ActionButton type="submit" icon="save" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</ActionButton>
                   </div>
 
                   {message ? <div className="notice ok">{message}</div> : null}
@@ -567,81 +732,107 @@ export default function App(): React.JSX.Element {
               ) : null}
 
               {kindleTab === 'diagnostico' ? (
-                <section className="panel diagnostics-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow">Kindle</p>
-                      <h2>SSH, jailbreak e scripts</h2>
-                    </div>
-                    <button type="button" className="ghost" onClick={() => void handleCheckKindle()} disabled={checkingKindle || saving}>
-                      {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
-                    </button>
-                  </div>
+                <section className="diag">
+                  <section className="panel diag-step">
+                    <header className="step-head">
+                      <span className="step-num" aria-hidden="true">1</span>
+                      <div className="step-info">
+                        <h2>Conectar e verificar</h2>
+                        <p className="step-sub">Confere SSH, jailbreak e ferramentas no aparelho.</p>
+                      </div>
+                      <ActionButton className="ghost" icon="search" onClick={() => void handleCheckKindle()} disabled={checkingKindle || saving}>
+                        {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
+                      </ActionButton>
+                    </header>
 
-                  {kindle ? (
-                    <div className="status-list">
-                      <div className="status-row">
-                        <span className={`badge ${kindle.connected ? 'ok' : 'warn'}`}>{statusLabel(kindle.connected)}</span>
-                        <div>
-                          <strong>SSH {kindle.model ? `· ${kindle.model}` : ''}</strong>
-                          <p>{kindle.detail}</p>
+                    {kindle ? (
+                      <>
+                        <div className={`conn-banner ${kindle.connected ? 'ok' : 'bad'}`}>
+                          <span className="conn-dot" aria-hidden="true" />
+                          <div className="conn-text">
+                            <strong>{kindle.connected ? 'Kindle conectado' : 'Kindle não encontrado'}</strong>
+                            <span>{kindle.detail}{kindle.model ? ` · ${kindle.model}` : ''}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="check-grid">
-                        <span className={kindle.jailbroken ? 'check ok' : 'check warn'}>Jailbreak</span>
-                        <span className={kindle.fbink ? 'check ok' : 'check warn'}>FBInk</span>
-                        <span className={kindle.hotfix ? 'check ok' : 'check warn'}>Hotfix</span>
-                        <span className={kindle.canInstall ? 'check ok' : 'check warn'}>Instalavel</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="muted">Depois do jailbreak, ative USBNetwork/KUAL e rode a verificacao por SSH.</p>
-                  )}
+                        <div className="req-grid">
+                          <ReqChip ok={kindle.jailbroken} label="Jailbreak" desc="Acesso root liberado" />
+                          <ReqChip ok={kindle.fbink} label="FBInk" desc="Mostra a imagem na tela" />
+                          <ReqChip ok={kindle.hotfix} label="Hotfix" desc="Correção de inicialização" />
+                          <ReqChip ok={kindle.canInstall} label="Pronto" desc="Pode instalar os scripts" />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="step-empty">Depois do jailbreak, ative USBNetwork/KUAL e toque em <strong>Verificar Kindle</strong>.</p>
+                    )}
+                  </section>
 
-                  <div className="scripts-section">
-                    <div className="scripts-head">
-                      <p className="eyebrow">Scripts</p>
-                      <span className="scripts-hint">Instala ou remove o autostart do dashboard no Kindle.</span>
-                    </div>
+                  <section className="panel diag-step">
+                    <header className="step-head">
+                      <span className="step-num" aria-hidden="true">2</span>
+                      <div className="step-info">
+                        <h2>Instalar scripts</h2>
+                        <p className="step-sub">Coloca o autostart do dashboard no Kindle.</p>
+                      </div>
+                      {kindleScript ? (
+                        <span className={`badge ${kindleScript.installed ? 'ok' : 'warn'}`}>
+                          {kindleScript.installed ? 'Instalado' : 'Ausente'}
+                        </span>
+                      ) : null}
+                    </header>
                     <div className="button-row">
-                      <button type="button" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
+                      <ActionButton icon="download" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
                         {installing ? 'Instalando...' : 'Instalar scripts'}
-                      </button>
-                      <button type="button" className="ghost danger" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
-                        {uninstalling ? 'Desinstalando...' : 'Desinstalar Script'}
-                      </button>
+                      </ActionButton>
+                      <ActionButton className="ghost danger" icon="trash" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
+                        {uninstalling ? 'Desinstalando...' : 'Desinstalar'}
+                      </ActionButton>
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="scripts-section">
-                    <div className="scripts-head">
-                      <p className="eyebrow">Execucao</p>
-                      <span className="scripts-hint">
-                        {kindleScript
-                          ? `${kindleScript.running ? 'Rodando' : 'Parado'} · ${kindleScript.enabled ? 'autostart ativo' : 'autostart inativo'} · backend ${kindleScript.backendReachable ? 'acessivel' : 'indisponivel'}`
-                          : 'Verifique o Kindle para consultar o estado do script.'}
-                      </span>
-                    </div>
+                  <section className="panel diag-step">
+                    <header className="step-head">
+                      <span className="step-num" aria-hidden="true">3</span>
+                      <div className="step-info">
+                        <h2>Executar no Kindle</h2>
+                        <p className="step-sub">Liga ou desliga o loop que atualiza a tela.</p>
+                      </div>
+                    </header>
+
+                    {kindleScript ? (
+                      <div className="exec-grid">
+                        <ExecPill ok={kindleScript.running} label="Loop" value={kindleScript.running ? 'Rodando' : 'Parado'} />
+                        <ExecPill ok={kindleScript.enabled} label="Autostart" value={kindleScript.enabled ? 'Ativo' : 'Inativo'} />
+                        <ExecPill ok={kindleScript.backendReachable} label="Backend" value={kindleScript.backendReachable ? 'Acessível' : 'Indisponível'} />
+                      </div>
+                    ) : (
+                      <p className="step-empty">Verifique o Kindle para ver o estado do script.</p>
+                    )}
+
                     <div className="button-row">
-                      <button
-                        type="button"
+                      <ActionButton
+                        icon="play"
                         onClick={() => void handleKindleScript('start')}
                         disabled={!kindleScript?.installed || kindleScript.running || scriptAction !== null || installing || uninstalling || checkingKindle}
                       >
                         {scriptAction === 'start' ? 'Iniciando...' : 'Iniciar script'}
-                      </button>
-                      <button
-                        type="button"
+                      </ActionButton>
+                      <ActionButton
                         className="ghost"
+                        icon="stop"
                         onClick={() => void handleKindleScript('stop')}
                         disabled={!kindleScript?.running || scriptAction !== null || installing || uninstalling || checkingKindle}
                       >
                         {scriptAction === 'stop' ? 'Parando...' : 'Parar script'}
-                      </button>
+                      </ActionButton>
                     </div>
-                  </div>
+                  </section>
 
-                  {installOutput ? <pre className="output-log">{installOutput}</pre> : null}
+                  {installOutput ? (
+                    <details className="tech-log">
+                      <summary>Detalhes técnicos</summary>
+                      <pre className="output-log">{installOutput}</pre>
+                    </details>
+                  ) : null}
                   {message ? <div className="notice ok">{message}</div> : null}
                   {error ? <div className="notice error">{error}</div> : null}
                 </section>
@@ -654,12 +845,12 @@ export default function App(): React.JSX.Element {
               <section className="panel diagnostics-panel">
                 <div className="panel-heading">
                   <div>
-                    <p className="eyebrow">Diagnostico</p>
+                    <p className="eyebrow">Diagnóstico</p>
                     <h2>Login das fontes</h2>
                   </div>
-                  <button type="button" className="ghost" onClick={() => void refreshAuth()} disabled={checkingAuth}>
+                  <ActionButton className="ghost" icon="refresh" onClick={() => void refreshAuth()} disabled={checkingAuth}>
                     {checkingAuth ? 'Checando...' : 'Reverificar'}
-                  </button>
+                  </ActionButton>
                 </div>
 
                 <div className="status-list">
@@ -674,14 +865,14 @@ export default function App(): React.JSX.Element {
                           {!source.ok && source.hint ? <small>{source.hint}</small> : null}
                         </div>
                         {action ? (
-                          <button type="button" className="ghost" onClick={() => void handleOpenLogin(action)}>
+                          <ActionButton className="ghost" icon="login" onClick={() => void handleOpenLogin(action)}>
                             Login
-                          </button>
+                          </ActionButton>
                         ) : null}
                       </div>
                     )
                   })}
-                  {!auth ? <p className="muted">Carregando status de auth...</p> : null}
+                  {!auth ? <p className="muted">Carregando status de autenticação...</p> : null}
                 </div>
 
                 {message ? <div className="notice ok">{message}</div> : null}
@@ -689,7 +880,6 @@ export default function App(): React.JSX.Element {
               </section>
             </section>
           ) : null}
-
         </main>
       </div>
     </div>

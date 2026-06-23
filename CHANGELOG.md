@@ -2,6 +2,25 @@
 
 Todas as mudancas relevantes deste projeto ficam registradas aqui.
 
+## [v1.0.2](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-22
+
+Kindle Dashboard v1.0.2
+
+### Melhorado
+
+- Interface ajustada para usar acentuacao correta nos textos visiveis do app.
+- Padrao visual de botoes atualizado para exibir icone junto do rotulo em toda a UI.
+- Fluxo de diagnostico do Kindle refinado com acoes mais claras e melhor leitura operacional.
+
+### Documentacao
+
+- Regra do projeto atualizada para exigir icones em todos os botoes visiveis.
+- Guia de instalacao em ingles adicionado e documentacao principal revisada.
+
+### Versao
+
+- Bump de versao do app para `1.0.2`.
+
 ## [v1.0.1](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-18
 
 Kindle Dashboard v1.0.1

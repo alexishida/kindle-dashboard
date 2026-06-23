@@ -265,7 +265,7 @@ async function writeConfig(config: StoredDashboardConfig): Promise<void> {
 
 function recordInput(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Configuracao invalida')
+    throw new Error('Configuração inválida')
   }
   return value as Record<string, unknown>
 }
@@ -274,8 +274,8 @@ function requiredString(input: Record<string, unknown>, key: string, maxLength: 
   const value = input[key]
   if (typeof value !== 'string') throw new Error(`${key} deve ser texto`)
   const trimmed = value.trim()
-  if (!trimmed) throw new Error(`${key} e obrigatorio`)
-  if (trimmed.length > maxLength) throw new Error(`${key} e muito longo`)
+  if (!trimmed) throw new Error(`${key} é obrigatório`)
+  if (trimmed.length > maxLength) throw new Error(`${key} é muito longo`)
   return trimmed
 }
 
@@ -491,7 +491,7 @@ function loginScript(tool: AuthLoginTool): string {
     `Write-Host 'Kindle Dashboard - login ${label}'`,
     "Write-Host ''",
     `Write-Host 'Executando: ${command}'`,
-    "Write-Host 'Se o comando nao for encontrado, rode-o em um terminal normal e depois clique em Reverificar no app.'",
+    "Write-Host 'Se o comando não for encontrado, rode-o em um terminal normal e depois clique em Reverificar no app.'",
     "Write-Host ''",
     command,
     "Write-Host ''",
@@ -500,7 +500,7 @@ function loginScript(tool: AuthLoginTool): string {
 }
 
 function openLogin(tool: unknown): void {
-  if (tool !== 'claude' && tool !== 'codex') throw new Error('Ferramenta invalida')
+  if (tool !== 'claude' && tool !== 'codex') throw new Error('Ferramenta inválida')
 
   if (process.platform === 'win32') {
     const title = tool === 'claude' ? 'Kindle Dashboard - Claude Login' : 'Kindle Dashboard - Codex Login'
@@ -665,7 +665,7 @@ function createTray(): void {
 function buildTrayMenu(): Menu {
   return Menu.buildFromTemplate([
     {
-      label: 'Abrir configuracoes',
+      label: 'Abrir configurações',
       click: showSettingsWindow,
     },
     { type: 'separator' },
@@ -847,7 +847,7 @@ async function runStartupChecks(): Promise<void> {
   if (Notification.isSupported()) {
     new Notification({
       title: 'Kindle Dashboard',
-      body: 'Claude ou Codex precisa de login. Abra as configuracoes para corrigir.',
+      body: 'Claude ou Codex precisa de login. Abra as configurações para corrigir.',
     }).show()
   }
   showSettingsWindow()

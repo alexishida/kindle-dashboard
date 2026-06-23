@@ -40,6 +40,8 @@ export default function App(): React.JSX.Element {
   const [rendering, setRendering] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingLanguage, setSavingLanguage] = useState(false)
+  const [savingPip, setSavingPip] = useState(false)
+  const [savingPipScale, setSavingPipScale] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [checkingKindle, setCheckingKindle] = useState(false)
   const [installing, setInstalling] = useState(false)
@@ -83,6 +85,7 @@ export default function App(): React.JSX.Element {
     let unsubscribeRender = (): void => {}
     let unsubscribeSettings = (): void => {}
     let unsubscribePanel = (): void => {}
+    let unsubscribePip = (): void => {}
 
     async function hydrate(): Promise<void> {
       try {
@@ -121,12 +124,16 @@ export default function App(): React.JSX.Element {
     unsubscribePanel = window.dashboard.onOpenPanel(() => {
       setNav(configured ? 'painel' : 'configuracoes')
     })
+    unsubscribePip = window.dashboard.onPipChanged((enabled) => {
+      setConfig((current) => current ? { ...current, pictureInPicture: enabled } : current)
+    })
 
     return () => {
       if (timer) window.clearInterval(timer)
       unsubscribeRender()
       unsubscribeSettings()
       unsubscribePanel()
+      unsubscribePip()
     }
   }, [checkBackend, configured])
 
@@ -208,6 +215,34 @@ export default function App(): React.JSX.Element {
       showError('configuracoes', languageError instanceof Error ? languageError.message : String(languageError))
     } finally {
       setSavingLanguage(false)
+    }
+  }
+
+  async function handleTogglePictureInPicture(enabled: boolean): Promise<void> {
+    setSavingPip(true)
+    clearNotice('configuracoes')
+    try {
+      const saved = await window.dashboard.setPictureInPicture(enabled)
+      setConfig(saved)
+      showMessage('configuracoes', saved.pictureInPicture ? t('pipEnabled') : t('pipDisabled'))
+    } catch (pipError) {
+      showError('configuracoes', pipError instanceof Error ? pipError.message : String(pipError))
+    } finally {
+      setSavingPip(false)
+    }
+  }
+
+  async function handleChangePipScale(scale: number): Promise<void> {
+    setSavingPipScale(true)
+    clearNotice('configuracoes')
+    try {
+      const saved = await window.dashboard.setPictureInPictureScale(scale)
+      setConfig(saved)
+      showMessage('configuracoes', t('pipScaleSaved'))
+    } catch (pipScaleError) {
+      showError('configuracoes', pipScaleError instanceof Error ? pipScaleError.message : String(pipScaleError))
+    } finally {
+      setSavingPipScale(false)
     }
   }
 
@@ -365,7 +400,13 @@ export default function App(): React.JSX.Element {
               disabled={!config}
               languagePreference={config?.language ?? 'system'}
               onChangeLanguage={(language) => void handleSaveLanguage(language)}
+              onChangePictureInPictureScale={(scale) => void handleChangePipScale(scale)}
+              onTogglePictureInPicture={(enabled) => void handleTogglePictureInPicture(enabled)}
+              pictureInPicture={config?.pictureInPicture ?? false}
+              pictureInPictureScale={config?.pictureInPictureScale ?? 1.5}
               saving={savingLanguage}
+              savingPip={savingPip}
+              savingPipScale={savingPipScale}
               systemLanguage={runtime?.systemLanguage}
               t={t}
             />

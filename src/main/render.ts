@@ -11,6 +11,7 @@ import {
 } from './constants'
 import { getActiveLanguage, text } from './i18n'
 import { runtimeOutputPath } from './paths'
+import { refreshPipWindow } from './pip'
 import { getMainWindow, secureWindow } from './windows'
 
 interface CaptureViewport {
@@ -147,6 +148,7 @@ async function performRender(): Promise<RenderResult> {
   }
   lastRenderResult = result
   getMainWindow()?.webContents.send('render:completed', result)
+  refreshPipWindow()
   return result
 }
 

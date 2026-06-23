@@ -17,7 +17,10 @@ export default defineConfig({
     build: {
       outDir: resolve('dist/preload'),
       rollupOptions: {
-        input: { index: resolve('src/preload/index.ts') },
+        input: {
+          index: resolve('src/preload/index.ts'),
+          pip: resolve('src/preload/pip.ts'),
+        },
       },
     },
   },

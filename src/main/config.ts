@@ -18,7 +18,18 @@ export interface StoredDashboardConfig {
   kindleRefreshInterval: number
   kindleUser: string
   kindleWifiRetryEvery: number
+  pictureInPicture: boolean
+  pictureInPictureScale: number
   setupComplete: boolean
+}
+
+// Multiplicadores de tamanho oferecidos na UI para a janela PiP.
+export const PIP_SCALES = [1, 1.25, 1.5, 1.75, 2]
+const DEFAULT_PIP_SCALE = 1.5
+
+function normalizePipScale(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number.parseFloat(String(raw ?? ''))
+  return PIP_SCALES.includes(value) ? value : DEFAULT_PIP_SCALE
 }
 
 let dashboardConfig: StoredDashboardConfig | null = null
@@ -37,6 +48,8 @@ function defaultStoredConfig(): StoredDashboardConfig {
     kindleRefreshInterval: 45,
     kindleUser: '',
     kindleWifiRetryEvery: 3,
+    pictureInPicture: false,
+    pictureInPictureScale: DEFAULT_PIP_SCALE,
     setupComplete: false,
   }
 }
@@ -79,6 +92,8 @@ export function publicConfig(config: StoredDashboardConfig): DashboardConfig {
     kindleUser: config.kindleUser,
     kindleWifiRetryEvery: config.kindleWifiRetryEvery,
     language: config.language,
+    pictureInPicture: config.pictureInPicture,
+    pictureInPictureScale: config.pictureInPictureScale,
     setupComplete: config.setupComplete,
   }
 }
@@ -102,6 +117,8 @@ export async function loadConfig(): Promise<StoredDashboardConfig> {
       kindleRefreshInterval: positiveInt(String(raw.kindleRefreshInterval ?? ''), defaults.kindleRefreshInterval),
       kindleUser: typeof raw.kindleUser === 'string' ? raw.kindleUser : defaults.kindleUser,
       kindleWifiRetryEvery: positiveInt(String(raw.kindleWifiRetryEvery ?? ''), defaults.kindleWifiRetryEvery),
+      pictureInPicture: raw.pictureInPicture === true,
+      pictureInPictureScale: normalizePipScale(raw.pictureInPictureScale),
       setupComplete: raw.setupComplete === true,
     }
   } catch {
@@ -176,5 +193,25 @@ export async function setLanguage(raw: unknown): Promise<DashboardConfig> {
   }
   await writeConfig(next)
   applyLanguagePreference(next.language)
+  return publicConfig(next)
+}
+
+export async function setPictureInPicture(enabled: unknown): Promise<DashboardConfig> {
+  const previous = await loadConfig()
+  const next: StoredDashboardConfig = {
+    ...previous,
+    pictureInPicture: enabled === true,
+  }
+  await writeConfig(next)
+  return publicConfig(next)
+}
+
+export async function setPictureInPictureScale(scale: unknown): Promise<DashboardConfig> {
+  const previous = await loadConfig()
+  const next: StoredDashboardConfig = {
+    ...previous,
+    pictureInPictureScale: normalizePipScale(scale),
+  }
+  await writeConfig(next)
   return publicConfig(next)
 }

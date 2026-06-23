@@ -1,197 +1,237 @@
 # Kindle Dashboard
 
-Desktop dashboard to track AI tool usage and display the image on a
-jailbroken Kindle Paperwhite.
+Desktop dashboard for tracking AI tool usage and displaying an always-fresh
+image on a jailbroken Kindle Paperwhite.
 
-The app runs on the PC via Electron, collects local data, renders a PNG, and
-serves that image on the local network. The Kindle just periodically
-downloads the PNG and draws it on screen with FBInk.
+The app runs on the PC via Electron, collects local data, renders a high
+contrast PNG, and serves it at `http://<IP_DO_PC>:8787/dash.png`. The Kindle
+downloads that image on the local network and draws it on screen with FBInk.
 
-This project **does not perform the jailbreak**. It assumes the Kindle is
-already unlocked, with SSH and FBInk available.
+This project does not jailbreak the Kindle. It assumes the device is already
+prepared, with SSH and FBInk working.
 
----
+## Key Features
+
+- AI usage dashboard for Claude Code and OpenAI Codex.
+- Atomic PNG render optimized for e-ink screens.
+- Local server with `/dash.png`, `/render`, `/api/ping`, `/api/auth`, and `/api/usage`.
+- Kindle setup through the UI: IP, SSH port, SSH user, password, PNG URL, and intervals.
+- Remote diagnostics for SSH, jailbreak, FBInk, hotfix, and installed scripts.
+- Install, remove, start, and stop Kindle scripts from the UI.
+- Windows tray actions to open the panel, open settings, refresh, and quit.
+- Always-on-top desktop `Picture-in-Picture` window with configurable scale.
+- Multilingual desktop UI and rendered PNG.
+- Current languages: `pt-BR`, `en`, and `es`, with fallback to `en`.
 
 ## Screenshots
 
 | Panel | Kindle Configuration |
-|---|---|
-| ![painel](screenshot/painel.jpg) | ![kindle-config](screenshot/kindle-config.jpg) |
-| **Diagnostics and Installation** | **Logins** |
-| ![kindle-install](screenshot/kindle-install.jpg) | ![logins](screenshot/logins.jpg) |
-| **Example** |
-| ![exemplo](screenshot/exemplo.jpg) |
+| --- | --- |
+| ![Panel](screenshot/painel.jpg) | ![Kindle Configuration](screenshot/kindle-config.jpg) |
 
----
+| Diagnostics and Installation | Logins |
+| --- | --- |
+| ![Diagnostics and Installation](screenshot/kindle-install.jpg) | ![Logins](screenshot/logins.jpg) |
 
-## Usage Guide
+![Kindle example](screenshot/exemplo.jpg)
 
-### 1. Requirements
+## How It Works
 
-On the Kindle:
+1. The PC opens the Electron app and starts the local backend.
+2. The backend collects local AI tool data.
+3. The main process renders the `/render` page as a PNG.
+4. The app publishes the image at `/dash.png`.
+5. The Kindle downloads the PNG over HTTP on the configured interval.
+6. The Kindle script uses FBInk to update the screen.
 
-- Kindle Paperwhite with jailbreak done (e.g.: WinterBreak).
+In the Electron app, the PC render interval follows the Kindle download
+interval. This keeps the PC from rendering faster than the Kindle downloads.
+
+## Requirements
+
+### PC
+
+- Windows 10 or Windows 11.
+- Node.js `>=24` for development.
+- Claude Code and/or OpenAI Codex installed if you want usage from those tools.
+
+### Kindle
+
+- Kindle Paperwhite with jailbreak already completed.
 - SSH enabled and reachable on the local network.
 - FBInk installed.
 - Kindle and PC on the same Wi-Fi network.
 
-On the PC (Windows):
+## User Installation
 
-- Windows 10/11.
-- Optional: Claude Code and/or Codex installed, if you want the dashboard to
-  show usage of those tools.
-
-### 2. Install the app on the PC
-
-Download the `.exe` installer (generated via `npm run build:win`, see
-[Development Information](#development-information)) and run it normally,
-like any other Windows program.
-
-After installing, open "Kindle Dashboard" from the Start Menu. On subsequent
-launches, if the configuration is already complete, the app starts directly
-in the background and stays available in the Windows tray (icon near the
-clock).
-
-### 3. Configure the Kindle through the app
-
-On first launch, the app shows the **Kindle > Configuration** tab. Fill in:
-
-| Field | What to enter |
-| --- | --- |
-| Kindle IP | The Kindle's IP address on the local network |
-| SSH Port | Usually `22` |
-| SSH User | Usually `root` |
-| SSH Password | The Kindle's SSH access password |
-| PC IP | Your PC's IP on the same network; the app builds the PNG URL automatically (`http://<PC_IP>:8787/dash.png`) |
-| Kindle Download (seconds) | Interval between PNG downloads on the Kindle |
-| Full Refresh (cycles) | Every how many downloads the Kindle does a full screen refresh |
-| Wi-Fi Retry (consecutive failures) | After how many consecutive failures the Kindle tries to reconnect Wi-Fi |
-
-After clicking **Save**:
-
-1. Open the **Kindle > Script Diagnostics and Installation** tab.
-2. Click **Check Kindle** and confirm that SSH, jailbreak, FBInk and other
-   checks show up as OK.
-3. Click **Install scripts**. This copies the autostart scripts to the
-   Kindle and registers the boot job.
-4. Go to **Logins** and resolve any pending Claude Code/Codex login issues,
-   if the diagnostics ask for it.
-
-With the scripts installed, the Kindle starts downloading and displaying the
-PNG on its own, even after rebooting.
-
-### 4. Day-to-day usage
-
-- The main panel (**Panel**) shows a preview of the current image and a
-  **Refresh now** button to force a new render.
-- In **Kindle > Diagnostics**, use **Start script** and **Stop script** to
-  control the loop on the device without removing the autostart.
-- The app stays in the Windows tray. Click the icon to reopen the window;
-  the tray menu has **Open settings** and **Quit**.
-- For the app to start automatically with Windows, use the Windows autostart
-  scripts (see [NPM Scripts](#npm-scripts) below).
-
-### 5. Uninstall / remove
-
-To remove the Kindle autostart, use the **Uninstall Script** button in the
-**Kindle > Script Diagnostics and Installation** tab, or see the manual
-step-by-step in [KINDLE-INSTALLATION.md](KINDLE-INSTALLATION.md).
-
----
-
-## Development Information
-
-### Current State
-
-- Electron + React + TypeScript application integrated with `electron-vite`.
-- Node backend embedded in the Electron main process.
-- Atomic PNG render to `out/dash.png` in dev mode.
-- Windows tray with actions to open settings and quit.
-- First-run flow with Kindle configuration via SSH.
-- Local login check for Claude Code and Codex.
-- Kindle script installer over SSH, without SFTP.
-
-### Configuration
-
-All operational configuration for the product lives in the Electron UI,
-notably:
-
-- Dashboard URL
-- Kindle SSH IP, port, user, and password
-- download interval
-- full refresh
-- Wi-Fi recovery retry
-
-The app saves this data in local `userData`. Don't use `.env` for the
-normal product flow configuration.
-
-### NPM Scripts
-
-```powershell
-npm run dev               # opens the Electron app in development
-npm run build              # typecheck + Electron build
-npm run build:win          # generates the Windows installer
-npm run typecheck          # validates TypeScript
-npm test                   # runs Node tests
-npm run backend            # legacy standalone backend
-npm run supervisor         # legacy fallback with Chrome installed
-npm run autostart:install  # registers the app to start with Windows
-npm run autostart:status   # checks Windows autostart status
-npm run autostart:stop     # stops Windows autostart
-npm run autostart:uninstall # removes Windows autostart
-```
-
-Kindle-related commands (install/remove scripts, check status) should be
-done through the Electron UI. Details on what each remote script does:
-[KINDLE-INSTALLATION.md](KINDLE-INSTALLATION.md).
-
-### Structure
-
-```text
-backend/       local API, collectors, and auth preflight
-build/         app icons
-kindle/        scripts that run on the Kindle
-render/        HTML used to generate the PNG
-scripts/       Node/PowerShell helpers
-src/main/      Electron main process
-src/preload/   secure bridge via contextBridge
-src/renderer/  React UI
-src/shared/    shared types
-test/          Node tests
-```
-
-### Generating the Windows Installer (.exe)
-
-The installer is generated with `electron-builder` in NSIS format.
+Download the `.exe` installer from a release, or build it locally:
 
 ```powershell
 npm run build:win
 ```
 
-What happens:
+Then run the installer on Windows and open **Kindle Dashboard** from the Start
+Menu.
 
-1. **`npm run typecheck`** — validates TypeScript.
-2. **`electron-vite build`** — compiles main, preload, and renderer into `dist/`.
-3. **`electron-builder --win`** — packages the app + dependencies into a `.exe` installer in the `release/` folder.
+If setup is already complete, the app can start directly in the background and
+stay available in the Windows tray.
 
-**Prerequisites:**
+## First Run
 
-- Node.js >= 24 and dependencies installed (`npm install`).
-- App icon at `build/icon.png` (already included in the repository).
-- Windows 10/11 (cross-building from Linux/Mac is not supported by this project).
+Open **Kindle > Configuration** and fill in:
 
-The generated installer will be at `release/Kindle-Dashboard-<version>-setup.exe`.
+| Field | Expected value |
+| --- | --- |
+| Kindle IP | `<IP_DO_KINDLE>` |
+| SSH Port | Usually `22` |
+| SSH User | `<USUARIO_SSH>` |
+| SSH Password | `<SENHA_SSH>` |
+| PC IP | `<IP_DO_PC>` |
+| Kindle Download | Interval, in seconds, between PNG downloads |
+| Full Refresh | How many cycles between full Kindle refreshes |
+| Wi-Fi Retry | How many consecutive failures before Wi-Fi recovery |
 
-### Recommended Validation
+Then:
+
+1. Click **Save**.
+2. Open **Kindle > Diagnostics and Installation**.
+3. Click **Check Kindle**.
+4. Confirm that SSH, jailbreak, FBInk, and other checks are OK.
+5. Click **Install scripts**.
+6. Open **Logins** and resolve Claude Code or Codex login issues if they appear.
+
+Once scripts are installed, the Kindle downloads and displays the PNG on its
+own, including after reboot.
+
+## Daily Use
+
+- **Panel** shows the current PNG preview and can force a new render.
+- **Kindle > Diagnostics** starts or stops the Kindle loop without removing autostart.
+- **Logins** shows local authentication state.
+- **Settings** changes language and toggles `Picture-in-Picture`.
+- `Picture-in-Picture` shows the dashboard in a small always-on-top window.
+- The Windows tray can reopen the panel, open settings, refresh, and quit.
+
+To remove Kindle automation, use **Uninstall** in
+**Kindle > Diagnostics and Installation**. Manual guide:
+[KINDLE-INSTALLATION.md](KINDLE-INSTALLATION.md).
+
+## Multilingual Support
+
+Translatable text lives in `locales/<language>.json`.
+
+The app discovers languages automatically from files in `locales/`. Adding a
+new language does not require TypeScript changes: create a BCP-47 JSON file,
+translate values, and keep the keys. Missing keys fall back to `locales/en.json`.
+
+Details: [locales/README.md](locales/README.md).
+
+## Privacy
+
+Docs and examples must use placeholders:
+
+- `<IP_DO_PC>`
+- `<IP_DO_KINDLE>`
+- `<USUARIO_SSH>`
+- `<SENHA_SSH>`
+
+Do not commit:
+
+- Kindle serial number;
+- real PC or Kindle IP;
+- real username;
+- SSH password;
+- tokens, cookies, local databases, or session files;
+- logs, builds, installers, or runtime PNGs.
+
+The SSH password saved by the app lives in Electron `userData` and uses
+`safeStorage` when available. The renderer receives only public state, such as
+`kindlePasswordSaved`.
+
+## Development
+
+Install dependencies:
+
+```powershell
+npm install
+```
+
+Run the app in development:
+
+```powershell
+npm run dev
+```
+
+Main commands:
+
+```powershell
+npm run dev                # opens Electron in development
+npm run build              # typecheck + Electron build
+npm run build:win          # generates Windows installer
+npm run typecheck          # validates TypeScript
+npm test                   # runs Node tests
+npm run backend            # legacy standalone backend
+npm run supervisor         # legacy standalone supervisor
+npm run autostart:install  # registers Windows autostart
+npm run autostart:status   # shows Windows autostart status
+npm run autostart:stop     # stops Windows autostart
+npm run autostart:uninstall # removes Windows autostart
+```
+
+Kindle commands should be run through the Electron UI. The `npm run kindle` and
+`npm run kindle:autostart` scripts exist for support and local diagnostics.
+
+## Structure
+
+```text
+backend/       local API, collectors, and authentication preflight
+build/         app icons
+kindle/        scripts executed on the Kindle
+locales/       UI, main, auth, and dashboard translations
+render/        HTML used to render the PNG
+scripts/       Node and PowerShell helpers
+src/main/      Electron main process
+src/preload/   secure bridges via contextBridge
+src/renderer/  React UI
+src/shared/    shared types
+test/          Node tests
+```
+
+## Windows Installer Build
+
+```powershell
+npm run build:win
+```
+
+This command runs:
+
+1. `npm run typecheck`
+2. `electron-vite build`
+3. `electron-builder --win`
+
+Expected output:
+
+```text
+release/Kindle-Dashboard-<version>-setup.exe
+```
+
+## Recommended Validation
 
 ```powershell
 npm test
 npm run typecheck
+npm run build
 ```
 
-Run `npm run build` before generating the installer or publishing a release.
+Before publishing a release, also check that examples still use placeholders:
 
-### Changelog
+```powershell
+rg -n "<IP_DO_PC>|<IP_DO_KINDLE>|<USUARIO_SSH>|<SENHA_SSH>" README.md KINDLE-INSTALLATION.md
+```
+
+## Links
 
 - Change history: [CHANGELOG.md](CHANGELOG.md)
-- Public releases: [GitHub Releases](https://github.com/alexishida/kindle-dashboard/releases)
+- Kindle installation: [KINDLE-INSTALLATION.md](KINDLE-INSTALLATION.md)
+- Translations: [locales/README.md](locales/README.md)
+- Releases: [GitHub Releases](https://github.com/alexishida/kindle-dashboard/releases)

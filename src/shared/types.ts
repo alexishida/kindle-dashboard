@@ -31,6 +31,8 @@ export interface DashboardConfig {
   kindleUser: string
   kindleWifiRetryEvery: number
   language: LanguagePreference
+  pictureInPicture: boolean
+  pictureInPictureScale: number
   setupComplete: boolean
 }
 
@@ -98,6 +100,8 @@ export interface DashboardApi {
   getConfig: () => Promise<DashboardConfig>
   installKindle: () => Promise<KindleInstallResult>
   setLanguage: (language: LanguagePreference) => Promise<DashboardConfig>
+  setPictureInPicture: (enabled: boolean) => Promise<DashboardConfig>
+  setPictureInPictureScale: (scale: number) => Promise<DashboardConfig>
   startKindleScript: () => Promise<KindleScriptStatus>
   stopKindleScript: () => Promise<KindleScriptStatus>
   uninstallKindle: () => Promise<KindleInstallResult>
@@ -108,5 +112,6 @@ export interface DashboardApi {
   quit: () => Promise<void>
   onOpenPanel: (callback: () => void) => () => void
   onOpenSettings: (callback: () => void) => () => void
+  onPipChanged: (callback: (enabled: boolean) => void) => () => void
   onRenderCompleted: (callback: (result: RenderResult) => void) => () => void
 }

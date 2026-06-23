@@ -15,6 +15,8 @@ const api: DashboardApi = {
   getConfig: () => ipcRenderer.invoke('config:get'),
   installKindle: () => ipcRenderer.invoke('kindle:install'),
   setLanguage: (language: LanguagePreference) => ipcRenderer.invoke('config:set-language', language),
+  setPictureInPicture: (enabled: boolean) => ipcRenderer.invoke('config:set-pip', enabled),
+  setPictureInPictureScale: (scale: number) => ipcRenderer.invoke('config:set-pip-scale', scale),
   startKindleScript: () => ipcRenderer.invoke('kindle:script-start'),
   stopKindleScript: () => ipcRenderer.invoke('kindle:script-stop'),
   uninstallKindle: () => ipcRenderer.invoke('kindle:uninstall'),
@@ -36,6 +38,13 @@ const api: DashboardApi = {
     }
     ipcRenderer.on('settings:open', listener)
     return () => ipcRenderer.removeListener('settings:open', listener)
+  },
+  onPipChanged: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, enabled: boolean): void => {
+      callback(enabled)
+    }
+    ipcRenderer.on('pip:state', listener)
+    return () => ipcRenderer.removeListener('pip:state', listener)
   },
   onRenderCompleted: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, result: RenderResult): void => {

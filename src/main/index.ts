@@ -4,6 +4,7 @@ import { startBackend, stopBackend } from './backend-bridge'
 import { loadConfig } from './config'
 import { applyLanguagePreference, loadLocales, text } from './i18n'
 import { registerIpc } from './ipc'
+import { applyPipPreference, destroyPipWindow } from './pip'
 import {
   destroyCaptureWindow,
   renderDashboard,
@@ -25,6 +26,7 @@ let quitInProgress: Promise<void> | null = null
 async function shutdown(): Promise<void> {
   stopRenderTimer()
   destroyCaptureWindow()
+  destroyPipWindow()
   destroyMainWindow()
   destroyTray()
   await stopBackend()
@@ -87,6 +89,7 @@ if (!hasLock) {
       onQuit: quitApplication,
     })
     await renderDashboard()
+    applyPipPreference(config.pictureInPicture)
     if (config.setupComplete) runStartupChecks()
   }).catch((error) => {
     console.error(error)

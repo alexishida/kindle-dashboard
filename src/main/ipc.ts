@@ -12,12 +12,21 @@ import type {
 } from '../shared/types'
 import { getAuthStatus, openLogin } from './auth'
 import { BASE_URL, REPO_URL } from './constants'
-import { loadConfig, publicConfig, saveConfig, setLanguage } from './config'
+import {
+  loadConfig,
+  publicConfig,
+  saveConfig,
+  setLanguage,
+  setPictureInPicture,
+  setPictureInPictureScale,
+} from './config'
 import { currentSystemLanguage } from './i18n'
 import { checkKindle, installKindle, manageKindleScript, uninstallKindle } from './kindle'
 import { appCommitHash, runtimeOutputPath } from './paths'
+import { applyPipPreference, applyPipScale } from './pip'
 import { getIntervalSeconds, getLastRender, renderDashboard, scheduleRender } from './render'
 import { refreshTray } from './tray'
+import { getMainWindow } from './windows'
 
 interface IpcHandlers {
   quitApplication: () => void
@@ -51,6 +60,25 @@ export function registerIpc(handlers: IpcHandlers): void {
     const saved = await setLanguage(language)
     refreshTray()
     return saved
+  })
+
+  ipcMain.handle('config:set-pip', async (_event, enabled: boolean): Promise<DashboardConfig> => {
+    const saved = await setPictureInPicture(enabled)
+    applyPipPreference(saved.pictureInPicture)
+    return saved
+  })
+
+  ipcMain.handle('config:set-pip-scale', async (_event, scale: number): Promise<DashboardConfig> => {
+    const saved = await setPictureInPictureScale(scale)
+    applyPipScale()
+    return saved
+  })
+
+  // Botao "fechar" dentro da janela PiP: desliga a preferencia e avisa a UI.
+  ipcMain.handle('pip:close', async (): Promise<void> => {
+    const saved = await setPictureInPicture(false)
+    applyPipPreference(saved.pictureInPicture)
+    getMainWindow()?.webContents.send('pip:state', saved.pictureInPicture)
   })
 
   ipcMain.handle('auth:check', (): AuthStatus => getAuthStatus())

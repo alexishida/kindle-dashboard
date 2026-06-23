@@ -13,6 +13,9 @@
     } else if (params.get('desktop') === '1') {
       document.documentElement.className = 'desktop';
     }
+    if (params.get('pip') === '1') {
+      document.documentElement.classList.add('pip');
+    }
   })();
 </script>
 <style>
@@ -45,6 +48,24 @@
     transform: scale(var(--capture-scale));
     transform-origin: top left;
   }
+  /* PiP: janela flutuante no PC. Sem moldura, entao todo o corpo arrasta a janela. */
+  html.pip body { -webkit-app-region: drag; cursor: move; }
+  html.pip .stage { box-shadow: inset 0 0 0 4px #000; }
+  /* Botao fechar: fora do conteudo (position fixed), invisivel ate o hover, para
+     nao interferir na visualizacao. -webkit-app-region: no-drag = clicavel. */
+  #pip-close { display: none; }
+  html.pip #pip-close {
+    display: flex; align-items: center; justify-content: center;
+    position: fixed; top: 6px; right: 6px; z-index: 10;
+    width: 26px; height: 26px; padding: 0;
+    border: none; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6); color: #fff;
+    font: 18px/1 Helvetica, Arial, sans-serif; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s ease;
+    -webkit-app-region: no-drag;
+  }
+  html.pip:hover #pip-close { opacity: 1; }
+  html.pip #pip-close:hover { background: #000; }
 
   header {
     display: flex; justify-content: space-between; align-items: baseline;
@@ -73,6 +94,7 @@
 </style>
 </head>
 <body>
+  <button id="pip-close" type="button" aria-label="Close" title="Close">&times;</button>
   <div class="stage">
     <header>
       <h1 id="title">Token Dashboard</h1>
@@ -86,6 +108,16 @@
   var params = new URLSearchParams(location.search);
   var lang = params.get('lang') || 'en';
   var API = '/api/usage';
+
+  // Liga o botao fechar da janela PiP (so existe quando pip=1 + preload pip.js).
+  if (params.get('pip') === '1') {
+    var closeBtn = document.getElementById('pip-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        if (window.pipControls && window.pipControls.close) window.pipControls.close();
+      });
+    }
+  }
 
   // Fallback minimo em ingles: garante que o PNG renderize mesmo se /api/i18n falhar.
   var FALLBACK = {

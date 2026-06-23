@@ -33,6 +33,8 @@ prepared, with SSH and FBInk working.
 | --- | --- |
 | ![Diagnostics and Installation](screenshot/kindle-install.jpg) | ![Logins](screenshot/logins.jpg) |
 
+![Picture-in-Picture](screenshot/pip.jpg)
+
 ![Kindle example](screenshot/exemplo.jpg)
 
 ## How It Works

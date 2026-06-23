@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AuthLoginTool, DashboardApi, DashboardConfigInput, RenderResult } from '../shared/types'
+import type {
+  AuthLoginTool,
+  DashboardApi,
+  DashboardConfigInput,
+  LanguagePreference,
+  RenderResult,
+} from '../shared/types'
 
 const api: DashboardApi = {
   checkAuth: () => ipcRenderer.invoke('auth:check'),
@@ -8,6 +14,7 @@ const api: DashboardApi = {
   getRuntimeInfo: () => ipcRenderer.invoke('runtime:get'),
   getConfig: () => ipcRenderer.invoke('config:get'),
   installKindle: () => ipcRenderer.invoke('kindle:install'),
+  setLanguage: (language: LanguagePreference) => ipcRenderer.invoke('config:set-language', language),
   startKindleScript: () => ipcRenderer.invoke('kindle:script-start'),
   stopKindleScript: () => ipcRenderer.invoke('kindle:script-stop'),
   uninstallKindle: () => ipcRenderer.invoke('kindle:uninstall'),
@@ -16,6 +23,13 @@ const api: DashboardApi = {
   renderNow: () => ipcRenderer.invoke('render:now'),
   saveConfig: (config: DashboardConfigInput) => ipcRenderer.invoke('config:save', config),
   quit: () => ipcRenderer.invoke('app:quit'),
+  onOpenPanel: (callback) => {
+    const listener = (): void => {
+      callback()
+    }
+    ipcRenderer.on('panel:open', listener)
+    return () => ipcRenderer.removeListener('panel:open', listener)
+  },
   onOpenSettings: (callback) => {
     const listener = (): void => {
       callback()

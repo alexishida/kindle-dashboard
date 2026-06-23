@@ -26,6 +26,17 @@ Este arquivo e a fonte oficial de regras para o Kindle Dashboard.
 - Nao registrar credenciais completas em erros. Mensagens devem indicar campo
   faltante, nao valor recebido.
 
+Privacy
+Do not commit:
+
+Kindle serial number.
+Real PC or Kindle IP.
+SSH password.
+Tokens, cookies, local databases, or session files.
+out/dash.png, logs, builds, installers, and local configs.
+Electron .env or config.json files.
+Sensitive data stays out of the renderer. The SSH password saved by the app lives in the Electron userData directory and uses safeStorage when available.
+
 ## Arquitetura
 
 - Manter Electron + React + TypeScript com `electron-vite`.
@@ -98,6 +109,9 @@ Este arquivo e a fonte oficial de regras para o Kindle Dashboard.
 - A UI Electron deve ser operacional, nao landing page.
 - Primeira tela deve permitir configurar, verificar, instalar, revisar auth e
   ver erros.
+- Toda mensagem global de sucesso, aviso ou erro da UI deve aparecer no topo da
+  area de conteudo, logo abaixo do header/topbar, e nunca como ultimo item da
+  tela.
 - Todo botao visivel na UI deve ter icone junto do rotulo, inclusive acoes
   primarias, secundarias e abas clicaveis.
 - Tray do Windows deve oferecer abrir painel, abrir configuracoes, atualizar e

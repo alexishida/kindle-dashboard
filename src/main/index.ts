@@ -1,11 +1,22 @@
 import { spawn } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import type { Server } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
-import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, shell, Tray } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeImage,
+  Notification,
+  safeStorage,
+  screen,
+  shell,
+  Tray,
+} from 'electron'
 import type {
   AuthLoginTool,
   AuthSourceStatus,
@@ -15,8 +26,10 @@ import type {
   KindleInstallResult,
   KindleScriptStatus,
   KindleStatus,
+  LanguagePreference,
   RenderResult,
   RuntimeInfo,
+  SupportedLanguage,
 } from '../shared/types'
 
 interface BackendDependencies {
@@ -63,6 +76,7 @@ interface SshOptions {
 
 interface StoredDashboardConfig {
   dashboardUrl: string
+  language: LanguagePreference
   kindleFullRefreshEvery: number
   kindleIp: string
   kindlePasswordEncoding?: 'plain' | 'safeStorage'
@@ -75,6 +89,12 @@ interface StoredDashboardConfig {
   setupComplete: boolean
 }
 
+interface CaptureViewport {
+  height: number
+  scale: number
+  width: number
+}
+
 const PORT = positiveInt(process.env.PORT, 8787)
 const BASE_URL = `http://127.0.0.1:${PORT}`
 const REPO_URL = 'https://github.com/alexishida/kindle-dashboard'
@@ -82,6 +102,80 @@ const CAPTURE_WIDTH = 1072
 const CAPTURE_HEIGHT = 1448
 const LANDSCAPE_CAPTURE_WIDTH = CAPTURE_HEIGHT
 const LANDSCAPE_CAPTURE_HEIGHT = CAPTURE_WIDTH
+
+const execFileAsync = promisify(execFile)
+
+const UI_TEXT: Record<SupportedLanguage, Record<string, string>> = {
+  en: {
+    configInvalid: 'Invalid configuration',
+    configRequired: '{field} is required',
+    configText: '{field} must be text',
+    configTooLong: '{field} is too long',
+    dashboardUrlProtocol: 'Dashboard URL must use http or https',
+    invalidTool: 'Invalid tool',
+    loginIntro: 'Kindle Dashboard - login {label}',
+    loginMissing: 'If command is missing, run it in a normal terminal and then click Recheck in app.',
+    loginReturn: 'When finished, return to Kindle Dashboard and click Recheck.',
+    loginRun: 'Running: {command}',
+    loginWindow: 'Kindle Dashboard - {label}',
+    notificationBody: 'Claude or Codex needs login. Open settings to fix it.',
+    notificationTitle: 'Kindle Dashboard',
+    sshPasswordMissing: 'Save the Kindle SSH password before connecting',
+    trayOpenPanel: 'Open panel',
+    trayOpenSettings: 'Open settings',
+    trayQuit: 'Quit',
+    trayRefresh: 'Refresh now',
+    verifyFail: 'SSH failed: {message}',
+    verifyMissing: 'SSH connected, but missing: {missing}. Remote PATH: {path}',
+    verifyReady: 'Kindle ready to receive scripts',
+  },
+  'pt-BR': {
+    configInvalid: 'Configuração inválida',
+    configRequired: '{field} é obrigatório',
+    configText: '{field} deve ser texto',
+    configTooLong: '{field} é muito longo',
+    dashboardUrlProtocol: 'A URL do dashboard deve usar http ou https',
+    invalidTool: 'Ferramenta inválida',
+    loginIntro: 'Kindle Dashboard - login {label}',
+    loginMissing: 'Se o comando não for encontrado, rode-o em um terminal normal e depois clique em Reverificar no app.',
+    loginReturn: 'Quando terminar, volte ao Kindle Dashboard e clique em Reverificar.',
+    loginRun: 'Executando: {command}',
+    loginWindow: 'Kindle Dashboard - {label}',
+    notificationBody: 'Claude ou Codex precisa de login. Abra as configurações para corrigir.',
+    notificationTitle: 'Kindle Dashboard',
+    sshPasswordMissing: 'Informe e salve a senha SSH do Kindle antes de conectar',
+    trayOpenPanel: 'Abrir painel',
+    trayOpenSettings: 'Abrir configurações',
+    trayQuit: 'Sair',
+    trayRefresh: 'Atualizar agora',
+    verifyFail: 'Falha no SSH: {message}',
+    verifyMissing: 'SSH conectado, mas falta: {missing}. PATH remoto: {path}',
+    verifyReady: 'Kindle pronto para receber os scripts',
+  },
+  es: {
+    configInvalid: 'Configuración inválida',
+    configRequired: '{field} es obligatorio',
+    configText: '{field} debe ser texto',
+    configTooLong: '{field} es demasiado largo',
+    dashboardUrlProtocol: 'La URL del dashboard debe usar http o https',
+    invalidTool: 'Herramienta inválida',
+    loginIntro: 'Kindle Dashboard - login {label}',
+    loginMissing: 'Si el comando no existe, ejecútelo en una terminal normal y luego haga clic en Recheck en la app.',
+    loginReturn: 'Cuando termine, vuelva a Kindle Dashboard y haga clic en Recheck.',
+    loginRun: 'Ejecutando: {command}',
+    loginWindow: 'Kindle Dashboard - {label}',
+    notificationBody: 'Claude o Codex necesita iniciar sesión. Abra configuración para corregirlo.',
+    notificationTitle: 'Kindle Dashboard',
+    sshPasswordMissing: 'Guarde la contraseña SSH de Kindle antes de conectar',
+    trayOpenPanel: 'Abrir panel',
+    trayOpenSettings: 'Abrir configuración',
+    trayQuit: 'Salir',
+    trayRefresh: 'Actualizar ahora',
+    verifyFail: 'Fallo SSH: {message}',
+    verifyMissing: 'SSH conectado, pero falta: {missing}. PATH remoto: {path}',
+    verifyReady: 'Kindle listo para recibir scripts',
+  },
+}
 
 let mainWindow: BrowserWindow | null = null
 let captureWindow: BrowserWindow | null = null
@@ -97,17 +191,36 @@ let quitting = false
 let outputPath = ''
 let cachedAppCommit = process.env.APP_COMMIT?.trim() || process.env.GIT_COMMIT?.trim() || process.env.SOURCE_VERSION?.trim() || ''
 
-const execFileAsync = promisify(execFile)
-
-interface CaptureViewport {
-  height: number
-  scale: number
-  width: number
-}
-
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? '', 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function normalizeLanguage(value: string | undefined): SupportedLanguage {
+  const normalized = value?.toLowerCase() ?? ''
+  if (normalized.startsWith('pt')) return 'pt-BR'
+  if (normalized.startsWith('es')) return 'es'
+  return 'en'
+}
+
+function normalizeLanguagePreference(value: unknown): LanguagePreference {
+  if (value === 'system' || value === 'en' || value === 'pt-BR' || value === 'es') return value
+  return 'system'
+}
+
+function currentSystemLanguage(): SupportedLanguage {
+  return normalizeLanguage(app.getLocale())
+}
+
+function currentAppLanguage(config: StoredDashboardConfig | null = dashboardConfig): SupportedLanguage {
+  const preference = config?.language ?? 'system'
+  return preference === 'system' ? currentSystemLanguage() : preference
+}
+
+function text(key: string, config?: StoredDashboardConfig | null, vars?: Record<string, string>): string {
+  const language = currentAppLanguage(config)
+  const template = UI_TEXT[language][key] ?? UI_TEXT.en[key] ?? key
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) => vars?.[name] ?? '')
 }
 
 async function appCommitHash(): Promise<string> {
@@ -179,6 +292,7 @@ function defaultDashboardUrl(): string {
 function defaultStoredConfig(): StoredDashboardConfig {
   return {
     dashboardUrl: defaultDashboardUrl(),
+    language: 'system',
     kindleFullRefreshEvery: 20,
     kindleIp: '',
     kindlePort: 22,
@@ -226,6 +340,7 @@ function publicConfig(config: StoredDashboardConfig): DashboardConfig {
     kindleRefreshInterval: config.kindleRefreshInterval,
     kindleUser: config.kindleUser,
     kindleWifiRetryEvery: config.kindleWifiRetryEvery,
+    language: config.language,
     setupComplete: config.setupComplete,
   }
 }
@@ -239,6 +354,7 @@ async function loadConfig(): Promise<StoredDashboardConfig> {
     dashboardConfig = {
       ...defaults,
       dashboardUrl: typeof raw.dashboardUrl === 'string' ? raw.dashboardUrl : defaults.dashboardUrl,
+      language: normalizeLanguagePreference(raw.language),
       kindleFullRefreshEvery: positiveInt(String(raw.kindleFullRefreshEvery ?? ''), defaults.kindleFullRefreshEvery),
       kindleIp: typeof raw.kindleIp === 'string' ? raw.kindleIp : defaults.kindleIp,
       kindlePasswordEncoding: raw.kindlePasswordEncoding,
@@ -265,17 +381,17 @@ async function writeConfig(config: StoredDashboardConfig): Promise<void> {
 
 function recordInput(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Configuração inválida')
+    throw new Error(text('configInvalid'))
   }
   return value as Record<string, unknown>
 }
 
 function requiredString(input: Record<string, unknown>, key: string, maxLength: number): string {
   const value = input[key]
-  if (typeof value !== 'string') throw new Error(`${key} deve ser texto`)
+  if (typeof value !== 'string') throw new Error(text('configText', null, { field: key }))
   const trimmed = value.trim()
-  if (!trimmed) throw new Error(`${key} é obrigatório`)
-  if (trimmed.length > maxLength) throw new Error(`${key} é muito longo`)
+  if (!trimmed) throw new Error(text('configRequired', null, { field: key }))
+  if (trimmed.length > maxLength) throw new Error(text('configTooLong', null, { field: key }))
   return trimmed
 }
 
@@ -288,7 +404,7 @@ function numberField(input: Record<string, unknown>, key: string, fallback: numb
 function normalizedDashboardUrl(value: string): string {
   const url = new URL(value)
   if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new Error('A URL do dashboard deve usar http ou https')
+    throw new Error(text('dashboardUrlProtocol'))
   }
   return url.toString()
 }
@@ -315,9 +431,20 @@ async function saveConfig(raw: unknown): Promise<DashboardConfig> {
   return publicConfig(next)
 }
 
+async function setLanguage(raw: unknown): Promise<DashboardConfig> {
+  const previous = await loadConfig()
+  const next: StoredDashboardConfig = {
+    ...previous,
+    language: normalizeLanguagePreference(raw),
+  }
+  await writeConfig(next)
+  createTray()
+  return publicConfig(next)
+}
+
 function sshOptions(config: StoredDashboardConfig): SshOptions {
   const password = decryptPassword(config)
-  if (!password) throw new Error('Informe e salve a senha SSH do Kindle antes de conectar')
+  if (!password) throw new Error(text('sshPasswordMissing', config))
 
   return {
     host: config.kindleIp,
@@ -394,15 +521,15 @@ echo "hotfix=$(yn test -f /etc/upstart/kmc.conf)"
       !mntus && '/mnt/us',
       !hotfix && 'hotfix/Upstart',
     ].filter(Boolean).join(', ')
-    const missingDetail = missing
-      ? `SSH conectado, mas falta: ${missing}. PATH remoto: ${fields.path || 'desconhecido'}`
-      : 'Kindle pronto para receber os scripts'
+    const detail = canInstall
+      ? text('verifyReady', config)
+      : text('verifyMissing', config, { missing, path: fields.path || 'unknown' })
 
     return {
       canInstall,
       checkedAt,
       connected: true,
-      detail: canInstall ? 'Kindle pronto para receber os scripts' : missingDetail,
+      detail,
       fbink,
       hotfix,
       initctl,
@@ -416,7 +543,7 @@ echo "hotfix=$(yn test -f /etc/upstart/kmc.conf)"
       canInstall: false,
       checkedAt,
       connected: false,
-      detail: `Falha no SSH: ${error instanceof Error ? error.message : String(error)}`,
+      detail: text('verifyFail', config, { message: error instanceof Error ? error.message : String(error) }),
       fbink: false,
       hotfix: false,
       initctl: false,
@@ -485,25 +612,28 @@ async function manageKindleScript(action: 'status' | 'start' | 'stop'): Promise<
 function loginScript(tool: AuthLoginTool): string {
   const label = tool === 'claude' ? 'Claude Code' : 'OpenAI Codex'
   const command = tool === 'claude' ? 'claude' : 'codex login'
+  const config = dashboardConfig
 
   return [
-    `$Host.UI.RawUI.WindowTitle = 'Kindle Dashboard - ${label}'`,
-    `Write-Host 'Kindle Dashboard - login ${label}'`,
+    `$Host.UI.RawUI.WindowTitle = '${text('loginWindow', config, { label })}'`,
+    `Write-Host '${text('loginIntro', config, { label })}'`,
     "Write-Host ''",
-    `Write-Host 'Executando: ${command}'`,
-    "Write-Host 'Se o comando não for encontrado, rode-o em um terminal normal e depois clique em Reverificar no app.'",
+    `Write-Host '${text('loginRun', config, { command })}'`,
+    `Write-Host '${text('loginMissing', config)}'`,
     "Write-Host ''",
     command,
     "Write-Host ''",
-    "Write-Host 'Quando terminar, volte ao Kindle Dashboard e clique em Reverificar.'",
+    `Write-Host '${text('loginReturn', config)}'`,
   ].join('; ')
 }
 
 function openLogin(tool: unknown): void {
-  if (tool !== 'claude' && tool !== 'codex') throw new Error('Ferramenta inválida')
+  if (tool !== 'claude' && tool !== 'codex') throw new Error(text('invalidTool'))
 
   if (process.platform === 'win32') {
-    const title = tool === 'claude' ? 'Kindle Dashboard - Claude Login' : 'Kindle Dashboard - Codex Login'
+    const title = text('loginWindow', dashboardConfig, {
+      label: tool === 'claude' ? 'Claude Login' : 'Codex Login',
+    })
     const child = spawn('cmd.exe', [
       '/d',
       '/s',
@@ -650,6 +780,11 @@ function showSettingsWindow(): void {
   sendToRenderer('settings:open')
 }
 
+function showPanelWindow(): void {
+  restoreMainWindow()
+  sendToRenderer('panel:open')
+}
+
 function createTray(): void {
   if (tray) {
     tray.setContextMenu(buildTrayMenu())
@@ -665,12 +800,22 @@ function createTray(): void {
 function buildTrayMenu(): Menu {
   return Menu.buildFromTemplate([
     {
-      label: 'Abrir configurações',
+      label: text('trayOpenPanel'),
+      click: showPanelWindow,
+    },
+    {
+      label: text('trayOpenSettings'),
       click: showSettingsWindow,
+    },
+    {
+      label: text('trayRefresh'),
+      click: () => {
+        void renderDashboard()
+      },
     },
     { type: 'separator' },
     {
-      label: 'Encerrar',
+      label: text('trayQuit'),
       click: quitApplication,
     },
   ])
@@ -766,7 +911,9 @@ async function performRender(): Promise<RenderResult> {
   }
 
   const captureScale = viewport.scale.toFixed(6)
-  await captureWindow.loadURL(`${BASE_URL}/render?capture=${Date.now()}&captureScale=${captureScale}`)
+  await captureWindow.loadURL(
+    `${BASE_URL}/render?capture=${Date.now()}&captureScale=${captureScale}&lang=${encodeURIComponent(currentAppLanguage())}`,
+  )
   await waitUntilReady(captureWindow)
   const image = await captureWindow.webContents.capturePage({
     x: 0,
@@ -821,10 +968,12 @@ function registerIpc(): void {
       lastRender: lastRenderResult,
       outputPath,
       renderIntervalSeconds,
+      systemLanguage: currentSystemLanguage(),
     }
   })
   ipcMain.handle('config:get', async (): Promise<DashboardConfig> => publicConfig(await loadConfig()))
   ipcMain.handle('config:save', (_event, config: DashboardConfigInput) => saveConfig(config))
+  ipcMain.handle('config:set-language', (_event, language: LanguagePreference) => setLanguage(language))
   ipcMain.handle('auth:check', (): AuthStatus => getAuthStatus())
   ipcMain.handle('auth:openLogin', (_event, tool: AuthLoginTool): void => openLogin(tool))
   ipcMain.handle('app:openRepo', () => shell.openExternal(REPO_URL))
@@ -846,8 +995,8 @@ async function runStartupChecks(): Promise<void> {
 
   if (Notification.isSupported()) {
     new Notification({
-      title: 'Kindle Dashboard',
-      body: 'Claude ou Codex precisa de login. Abra as configurações para corrigir.',
+      title: text('notificationTitle'),
+      body: text('notificationBody'),
     }).show()
   }
   showSettingsWindow()

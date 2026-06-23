@@ -1,3 +1,7 @@
+export type SupportedLanguage = 'en' | 'pt-BR' | 'es'
+
+export type LanguagePreference = SupportedLanguage | 'system'
+
 export interface RuntimeInfo {
   appCommit: string
   appVersion: string
@@ -7,6 +11,7 @@ export interface RuntimeInfo {
   lastRender: RenderResult | null
   outputPath: string
   renderIntervalSeconds: number
+  systemLanguage: SupportedLanguage
 }
 
 export interface RenderResult {
@@ -23,6 +28,7 @@ export interface DashboardConfig {
   kindleRefreshInterval: number
   kindleUser: string
   kindleWifiRetryEvery: number
+  language: LanguagePreference
   setupComplete: boolean
 }
 
@@ -88,6 +94,7 @@ export interface DashboardApi {
   getRuntimeInfo: () => Promise<RuntimeInfo>
   getConfig: () => Promise<DashboardConfig>
   installKindle: () => Promise<KindleInstallResult>
+  setLanguage: (language: LanguagePreference) => Promise<DashboardConfig>
   startKindleScript: () => Promise<KindleScriptStatus>
   stopKindleScript: () => Promise<KindleScriptStatus>
   uninstallKindle: () => Promise<KindleInstallResult>
@@ -96,6 +103,7 @@ export interface DashboardApi {
   renderNow: () => Promise<RenderResult>
   saveConfig: (config: DashboardConfigInput) => Promise<DashboardConfig>
   quit: () => Promise<void>
+  onOpenPanel: (callback: () => void) => () => void
   onOpenSettings: (callback: () => void) => () => void
   onRenderCompleted: (callback: (result: RenderResult) => void) => () => void
 }

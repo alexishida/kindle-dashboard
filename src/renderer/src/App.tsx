@@ -8,12 +8,14 @@ import type {
   DashboardConfigInput,
   KindleScriptStatus,
   KindleStatus,
+  LanguagePreference,
   RenderResult,
   RuntimeInfo,
+  SupportedLanguage,
 } from '../../shared/types'
 
 type BackendState = 'checking' | 'online' | 'offline'
-type NavKey = 'painel' | 'kindle' | 'logins'
+type NavKey = 'painel' | 'kindle' | 'logins' | 'configuracoes'
 type KindleTab = 'config' | 'diagnostico'
 type KindleScriptAction = 'start' | 'stop'
 type IconName =
@@ -30,6 +32,7 @@ type IconName =
   | 'stop'
   | 'search'
   | 'github'
+  | 'globe'
 
 interface NavItem {
   key: NavKey
@@ -37,12 +40,6 @@ interface NavItem {
   hint: string
   icon: IconName
 }
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'painel', label: 'Painel', hint: 'Prévia e estado', icon: 'book' },
-  { key: 'kindle', label: 'Kindle', hint: 'Conexão e scripts', icon: 'kindle' },
-  { key: 'logins', label: 'Logins', hint: 'Autenticação das fontes', icon: 'login' },
-]
 
 interface ConfigForm {
   dashboardUrl: string
@@ -60,9 +57,329 @@ interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
   iconOnly?: boolean
 }
 
-function formatTime(value: string | null): string {
-  if (!value) return 'aguardando'
-  return new Date(value).toLocaleString('pt-BR', {
+const COPY: Record<SupportedLanguage, Record<string, string>> = {
+  en: {
+    action: 'Action',
+    appLoading: 'Starting dashboard...',
+    authChecking: 'Checking...',
+    authEyebrow: 'Diagnostics',
+    authLoading: 'Loading authentication status...',
+    authRecheck: 'Recheck',
+    authTitle: 'Source logins',
+    autostart: 'Autostart',
+    autostartActive: 'Active',
+    autostartInactive: 'Inactive',
+    backend: 'Backend',
+    backendChecking: 'Checking backend',
+    backendOffline: 'Backend offline',
+    backendOnline: 'Backend online',
+    backendPending: 'Setup pending',
+    checkKindle: 'Check Kindle',
+    checkingKindle: 'Checking...',
+    configBadgePending: 'Pending',
+    configBadgeReady: 'Ready',
+    configSaved: 'Settings saved',
+    configSectionEyebrow: 'Setup',
+    configSectionTitle: 'Kindle settings',
+    configureKindleFirst: 'Configure Kindle first',
+    connectionReady: 'Kindle connected',
+    connectionFail: 'Kindle not found',
+    dashboardGeneratedUrl: 'Generated URL: {value}',
+    dashboardHost: 'PC IP',
+    dashboardHostPlaceholder: 'e.g. 192.168.0.10',
+    detailsTechnical: 'Technical details',
+    diagnosticEmpty: 'After jailbreak, enable USBNetwork/KUAL and click Check Kindle.',
+    diagnosticScriptEmpty: 'Check the Kindle to see script status.',
+    diagnosticsInstall: 'Diagnostics and script install',
+    downloadInterval: 'Kindle download (seconds)',
+    fieldKindleIp: 'Kindle IP',
+    fieldKindleIpPlaceholder: 'e.g. Kindle IP',
+    fieldPassword: 'SSH password',
+    fieldPasswordPlaceholder: 'Kindle password',
+    fieldPasswordSaved: 'saved password; fill in to replace',
+    fieldPort: 'SSH port',
+    fieldUser: 'SSH user',
+    fieldWifiRetry: 'Wi-Fi retry (consecutive failures)',
+    fullRefresh: 'Full refresh (cycles)',
+    githubOpen: 'Open repository on GitHub',
+    hintDashboard: 'Preview and status',
+    hintKindle: 'Device and scripts',
+    hintLogins: 'Source authentication',
+    hintSettings: 'General preferences',
+    installScripts: 'Install scripts',
+    installing: 'Installing...',
+    installed: 'Installed',
+    languageAuto: 'Use system language',
+    languageDetected: 'Detected system language: {value}',
+    languageField: 'Language',
+    languageSaved: 'Language updated',
+    languageSectionEyebrow: 'Preferences',
+    languageSectionTitle: 'Interface language',
+    lastImage: 'Last image',
+    loading: 'Waiting',
+    loginButton: 'Login',
+    loop: 'Loop',
+    loopRunning: 'Running',
+    loopStopped: 'Stopped',
+    menuDashboard: 'Dashboard',
+    menuKindle: 'Kindle',
+    menuLogins: 'Logins',
+    menuSettings: 'Settings',
+    openSettingsTitle: 'Settings',
+    ok: 'OK',
+    panelBrandEyebrow: 'Kindle Paperwhite',
+    panelBrandTitle: 'Dashboard',
+    refreshNow: 'Refresh now',
+    refreshNowBusy: 'Refreshing...',
+    reqFbink: 'Shows image on screen',
+    reqHotfix: 'Startup patch installed',
+    reqJailbreak: 'Root access enabled',
+    reqReady: 'Ready for script install',
+    save: 'Save',
+    saving: 'Saving...',
+    scriptStarted: 'Script started on Kindle',
+    scriptStopped: 'Script stopped on Kindle',
+    scriptsInstalled: 'Scripts installed on Kindle',
+    scriptsRemoved: 'Scripts removed from Kindle',
+    settingsTitle: 'Settings',
+    sourceLoginOpenedClaude: 'Claude login window opened',
+    sourceLoginOpenedCodex: 'Codex login window opened',
+    startScript: 'Start script',
+    starting: 'Starting...',
+    statusInstalledMissing: 'Missing',
+    step1Sub: 'Checks SSH, jailbreak and required tools on device.',
+    step1Title: 'Connect and verify',
+    step2Sub: 'Installs dashboard autostart on Kindle.',
+    step2Title: 'Install scripts',
+    step3Sub: 'Starts or stops the loop that refreshes the screen.',
+    step3Title: 'Run on Kindle',
+    stopScript: 'Stop script',
+    stopping: 'Stopping...',
+    uninstall: 'Uninstall',
+    uninstallBusy: 'Uninstalling...',
+    uninstallConfirm: 'Uninstall Kindle scripts? Dashboard autostart will be removed from device.',
+    updatedAt: 'Updated',
+  },
+  'pt-BR': {
+    action: 'Ação',
+    appLoading: 'Iniciando o dashboard...',
+    authChecking: 'Checando...',
+    authEyebrow: 'Diagnóstico',
+    authLoading: 'Carregando status de autenticação...',
+    authRecheck: 'Reverificar',
+    authTitle: 'Login das fontes',
+    autostart: 'Autostart',
+    autostartActive: 'Ativo',
+    autostartInactive: 'Inativo',
+    backend: 'Backend',
+    backendChecking: 'Verificando backend',
+    backendOffline: 'Backend offline',
+    backendOnline: 'Backend online',
+    backendPending: 'Setup pendente',
+    checkKindle: 'Verificar Kindle',
+    checkingKindle: 'Verificando...',
+    configBadgePending: 'Pendente',
+    configBadgeReady: 'Pronto',
+    configSaved: 'Configuração salva',
+    configSectionEyebrow: 'Setup',
+    configSectionTitle: 'Configuração do Kindle',
+    configureKindleFirst: 'Configure o Kindle primeiro',
+    connectionReady: 'Kindle conectado',
+    connectionFail: 'Kindle não encontrado',
+    dashboardGeneratedUrl: 'URL gerada: {value}',
+    dashboardHost: 'IP do PC',
+    dashboardHostPlaceholder: 'ex.: 192.168.0.10',
+    detailsTechnical: 'Detalhes técnicos',
+    diagnosticEmpty: 'Depois do jailbreak, ative USBNetwork/KUAL e toque em Verificar Kindle.',
+    diagnosticScriptEmpty: 'Verifique o Kindle para ver o estado do script.',
+    diagnosticsInstall: 'Diagnóstico e scripts',
+    downloadInterval: 'Download Kindle (segundos)',
+    fieldKindleIp: 'IP do Kindle',
+    fieldKindleIpPlaceholder: 'ex.: IP do Kindle',
+    fieldPassword: 'Senha SSH',
+    fieldPasswordPlaceholder: 'senha do Kindle',
+    fieldPasswordSaved: 'senha salva; preencha para trocar',
+    fieldPort: 'Porta SSH',
+    fieldUser: 'Usuário SSH',
+    fieldWifiRetry: 'Retry Wi-Fi (falhas seguidas)',
+    fullRefresh: 'Refresh completo (ciclos)',
+    githubOpen: 'Abrir repositório no GitHub',
+    hintDashboard: 'Prévia e estado',
+    hintKindle: 'Conexão e scripts',
+    hintLogins: 'Autenticação das fontes',
+    hintSettings: 'Idioma e preferências',
+    installScripts: 'Instalar scripts',
+    installing: 'Instalando...',
+    installed: 'Instalado',
+    languageAuto: 'Usar idioma do sistema',
+    languageDetected: 'Idioma detectado do sistema: {value}',
+    languageField: 'Idioma',
+    languageSaved: 'Idioma atualizado',
+    languageSectionEyebrow: 'Preferências',
+    languageSectionTitle: 'Idioma da interface',
+    lastImage: 'Última imagem',
+    loading: 'aguardando',
+    loginButton: 'Login',
+    loop: 'Loop',
+    loopRunning: 'Rodando',
+    loopStopped: 'Parado',
+    menuDashboard: 'Painel',
+    menuKindle: 'Kindle',
+    menuLogins: 'Logins',
+    menuSettings: 'Configurações',
+    openSettingsTitle: 'Configurações',
+    ok: 'OK',
+    panelBrandEyebrow: 'Kindle Paperwhite',
+    panelBrandTitle: 'Dashboard',
+    refreshNow: 'Atualizar agora',
+    refreshNowBusy: 'Atualizando...',
+    reqFbink: 'Mostra a imagem na tela',
+    reqHotfix: 'Correção de inicialização',
+    reqJailbreak: 'Acesso root liberado',
+    reqReady: 'Pode instalar os scripts',
+    save: 'Salvar',
+    saving: 'Salvando...',
+    scriptStarted: 'Script iniciado no Kindle',
+    scriptStopped: 'Script parado no Kindle',
+    scriptsInstalled: 'Scripts instalados no Kindle',
+    scriptsRemoved: 'Scripts desinstalados do Kindle',
+    settingsTitle: 'Configurações',
+    sourceLoginOpenedClaude: 'Janela de login do Claude aberta',
+    sourceLoginOpenedCodex: 'Janela de login do Codex aberta',
+    startScript: 'Iniciar script',
+    starting: 'Iniciando...',
+    statusInstalledMissing: 'Ausente',
+    step1Sub: 'Confere SSH, jailbreak e ferramentas no aparelho.',
+    step1Title: 'Conectar e verificar',
+    step2Sub: 'Coloca o autostart do dashboard no Kindle.',
+    step2Title: 'Instalar scripts',
+    step3Sub: 'Liga ou desliga o loop que atualiza a tela.',
+    step3Title: 'Executar no Kindle',
+    stopScript: 'Parar script',
+    stopping: 'Parando...',
+    uninstall: 'Desinstalar',
+    uninstallBusy: 'Desinstalando...',
+    uninstallConfirm: 'Desinstalar os scripts do Kindle? O autostart do dashboard será removido do aparelho.',
+    updatedAt: 'Atualizado',
+  },
+  es: {
+    action: 'Acción',
+    appLoading: 'Iniciando dashboard...',
+    authChecking: 'Verificando...',
+    authEyebrow: 'Diagnóstico',
+    authLoading: 'Cargando estado de autenticación...',
+    authRecheck: 'Verificar de nuevo',
+    authTitle: 'Inicio de sesión de fuentes',
+    autostart: 'Autostart',
+    autostartActive: 'Activo',
+    autostartInactive: 'Inactivo',
+    backend: 'Backend',
+    backendChecking: 'Verificando backend',
+    backendOffline: 'Backend offline',
+    backendOnline: 'Backend online',
+    backendPending: 'Configuración pendiente',
+    checkKindle: 'Verificar Kindle',
+    checkingKindle: 'Verificando...',
+    configBadgePending: 'Pendiente',
+    configBadgeReady: 'Listo',
+    configSaved: 'Configuración guardada',
+    configSectionEyebrow: 'Setup',
+    configSectionTitle: 'Configuración de Kindle',
+    configureKindleFirst: 'Configure Kindle primero',
+    connectionReady: 'Kindle conectado',
+    connectionFail: 'Kindle no encontrado',
+    dashboardGeneratedUrl: 'URL generada: {value}',
+    dashboardHost: 'IP de PC',
+    dashboardHostPlaceholder: 'ej.: 192.168.0.10',
+    detailsTechnical: 'Detalles técnicos',
+    diagnosticEmpty: 'Después del jailbreak, active USBNetwork/KUAL y pulse Verificar Kindle.',
+    diagnosticScriptEmpty: 'Verifique Kindle para ver estado del script.',
+    diagnosticsInstall: 'Diagnóstico y scripts',
+    downloadInterval: 'Descarga de Kindle (segundos)',
+    fieldKindleIp: 'IP de Kindle',
+    fieldKindleIpPlaceholder: 'ej.: IP de Kindle',
+    fieldPassword: 'Contraseña SSH',
+    fieldPasswordPlaceholder: 'contraseña de Kindle',
+    fieldPasswordSaved: 'contraseña guardada; complete para cambiar',
+    fieldPort: 'Puerto SSH',
+    fieldUser: 'Usuario SSH',
+    fieldWifiRetry: 'Retry Wi-Fi (fallos seguidos)',
+    fullRefresh: 'Refresh completo (ciclos)',
+    githubOpen: 'Abrir repositorio en GitHub',
+    hintDashboard: 'Vista previa y estado',
+    hintKindle: 'Dispositivo y scripts',
+    hintLogins: 'Autenticación de fuentes',
+    hintSettings: 'Idioma y preferencias',
+    installScripts: 'Instalar scripts',
+    installing: 'Instalando...',
+    installed: 'Instalado',
+    languageAuto: 'Usar idioma del sistema',
+    languageDetected: 'Idioma detectado del sistema: {value}',
+    languageField: 'Idioma',
+    languageSaved: 'Idioma actualizado',
+    languageSectionEyebrow: 'Preferencias',
+    languageSectionTitle: 'Idioma de la interfaz',
+    lastImage: 'Última imagen',
+    loading: 'esperando',
+    loginButton: 'Login',
+    loop: 'Loop',
+    loopRunning: 'Ejecutándose',
+    loopStopped: 'Detenido',
+    menuDashboard: 'Panel',
+    menuKindle: 'Kindle',
+    menuLogins: 'Logins',
+    menuSettings: 'Configuración',
+    openSettingsTitle: 'Configuración',
+    ok: 'OK',
+    panelBrandEyebrow: 'Kindle Paperwhite',
+    panelBrandTitle: 'Dashboard',
+    refreshNow: 'Actualizar ahora',
+    refreshNowBusy: 'Actualizando...',
+    reqFbink: 'Muestra imagen en pantalla',
+    reqHotfix: 'Parche de arranque',
+    reqJailbreak: 'Acceso root habilitado',
+    reqReady: 'Puede instalar scripts',
+    save: 'Guardar',
+    saving: 'Guardando...',
+    scriptStarted: 'Script iniciado en Kindle',
+    scriptStopped: 'Script detenido en Kindle',
+    scriptsInstalled: 'Scripts instalados en Kindle',
+    scriptsRemoved: 'Scripts desinstalados de Kindle',
+    settingsTitle: 'Configuración',
+    sourceLoginOpenedClaude: 'Ventana de login de Claude abierta',
+    sourceLoginOpenedCodex: 'Ventana de login de Codex abierta',
+    startScript: 'Iniciar script',
+    starting: 'Iniciando...',
+    statusInstalledMissing: 'Ausente',
+    step1Sub: 'Comprueba SSH, jailbreak y herramientas en dispositivo.',
+    step1Title: 'Conectar y verificar',
+    step2Sub: 'Instala autostart del dashboard en Kindle.',
+    step2Title: 'Instalar scripts',
+    step3Sub: 'Inicia o detiene el loop que actualiza la pantalla.',
+    step3Title: 'Ejecutar en Kindle',
+    stopScript: 'Detener script',
+    stopping: 'Deteniendo...',
+    uninstall: 'Desinstalar',
+    uninstallBusy: 'Desinstalando...',
+    uninstallConfirm: '¿Desinstalar los scripts de Kindle? El autostart del dashboard será removido del dispositivo.',
+    updatedAt: 'Actualizado',
+  },
+}
+
+function resolveLanguage(preference: LanguagePreference | undefined, systemLanguage: SupportedLanguage | undefined): SupportedLanguage {
+  if (preference && preference !== 'system') return preference
+  return systemLanguage ?? 'en'
+}
+
+function localeForLanguage(language: SupportedLanguage): string {
+  if (language === 'pt-BR') return 'pt-BR'
+  if (language === 'es') return 'es-ES'
+  return 'en-US'
+}
+
+function formatTime(value: string | null, language: SupportedLanguage, waitingLabel: string): string {
+  if (!value) return waitingLabel
+  return new Date(value).toLocaleString(localeForLanguage(language), {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
@@ -101,10 +418,6 @@ function sourceAction(source: AuthSourceStatus): AuthLoginTool | null {
   if (source.name === 'claude') return 'claude'
   if (source.name === 'codex') return 'codex'
   return null
-}
-
-function statusLabel(ok: boolean): string {
-  return ok ? 'OK' : 'Ação'
 }
 
 function dashboardHostFromUrl(value: string): string {
@@ -255,6 +568,15 @@ function Icon({ name }: { name: IconName }): React.JSX.Element {
           <path d="m16 16 4 4" />
         </svg>
       )
+    case 'globe':
+      return (
+        <svg {...common} aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" />
+          <path d="M12 3a14 14 0 0 1 0 18" />
+          <path d="M12 3a14 14 0 0 0 0 18" />
+        </svg>
+      )
     case 'github':
       return (
         <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
@@ -295,10 +617,11 @@ export default function App(): React.JSX.Element {
   const [kindleScript, setKindleScript] = useState<KindleScriptStatus | null>(null)
   const [backendState, setBackendState] = useState<BackendState>('checking')
   const [lastRender, setLastRender] = useState<string | null>(null)
-  const [nav, setNav] = useState<NavKey>('kindle')
+  const [nav, setNav] = useState<NavKey>('configuracoes')
   const [kindleTab, setKindleTab] = useState<KindleTab>('config')
   const [rendering, setRendering] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingLanguage, setSavingLanguage] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [checkingKindle, setCheckingKindle] = useState(false)
   const [installing, setInstalling] = useState(false)
@@ -307,9 +630,15 @@ export default function App(): React.JSX.Element {
   const [previewKey, setPreviewKey] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [noticeNav, setNoticeNav] = useState<NavKey | null>(null)
   const [installOutput, setInstallOutput] = useState<string | null>(null)
 
   const configured = config?.setupComplete === true
+  const activeLanguage = resolveLanguage(config?.language, runtime?.systemLanguage)
+  const t = useCallback((key: string, vars?: Record<string, string>) => {
+    const template = COPY[activeLanguage][key] ?? COPY.en[key] ?? key
+    return template.replace(/\{(\w+)\}/g, (_match, name: string) => vars?.[name] ?? '')
+  }, [activeLanguage])
 
   const checkBackend = useCallback(async (baseUrl: string) => {
     try {
@@ -327,7 +656,7 @@ export default function App(): React.JSX.Element {
       setAuth(status)
       return status
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : String(authError))
+      showError('logins', authError instanceof Error ? authError.message : String(authError))
       return null
     } finally {
       setCheckingAuth(false)
@@ -338,6 +667,7 @@ export default function App(): React.JSX.Element {
     let timer: number | undefined
     let unsubscribeRender = (): void => {}
     let unsubscribeSettings = (): void => {}
+    let unsubscribePanel = (): void => {}
 
     async function hydrate(): Promise<void> {
       try {
@@ -351,14 +681,14 @@ export default function App(): React.JSX.Element {
         setConfig(savedConfig)
         setForm(formFromConfig(savedConfig))
         setAuth(authStatus)
-        setNav(savedConfig.setupComplete ? 'painel' : 'kindle')
+        setNav(savedConfig.setupComplete ? 'painel' : 'configuracoes')
         setLastRender(runtimeInfo.lastRender?.updatedAt ?? null)
         if (runtimeInfo.lastRender) setPreviewKey(Date.parse(runtimeInfo.lastRender.updatedAt) || Date.now())
         void checkBackend(runtimeInfo.baseUrl)
         timer = window.setInterval(() => void checkBackend(runtimeInfo.baseUrl), 5000)
       } catch (hydrateError) {
         setBackendState('offline')
-        setError(hydrateError instanceof Error ? hydrateError.message : String(hydrateError))
+        showError('configuracoes', hydrateError instanceof Error ? hydrateError.message : String(hydrateError))
       }
     }
 
@@ -367,21 +697,24 @@ export default function App(): React.JSX.Element {
     unsubscribeRender = window.dashboard.onRenderCompleted((result: RenderResult) => {
       setLastRender(result.updatedAt)
       setPreviewKey(Date.now())
-      setError(null)
+      if (noticeNav === 'painel') clearNotice('painel')
     })
     unsubscribeSettings = window.dashboard.onOpenSettings(() => {
       setNav('kindle')
       setKindleTab('config')
+    })
+    unsubscribePanel = window.dashboard.onOpenPanel(() => {
+      setNav(configured ? 'painel' : 'configuracoes')
     })
 
     return () => {
       if (timer) window.clearInterval(timer)
       unsubscribeRender()
       unsubscribeSettings()
+      unsubscribePanel()
     }
-  }, [checkBackend])
+  }, [checkBackend, configured])
 
-  const authNeedsAction = useMemo(() => auth?.sources.filter((source) => !source.ok) ?? [], [auth])
   const dashboardUrlPreview = useMemo(() => {
     if (!form?.dashboardUrl) return ''
     try {
@@ -390,12 +723,40 @@ export default function App(): React.JSX.Element {
       return form.dashboardUrl
     }
   }, [form?.dashboardUrl])
+
   const backendPill = useMemo(() => {
-    if (backendState === 'offline') return { className: 'offline', label: 'Backend offline' }
-    if (backendState === 'online' && !configured) return { className: 'pending', label: 'Setup pendente' }
-    if (backendState === 'online') return { className: 'online', label: 'Backend online' }
-    return { className: 'checking', label: 'Verificando backend' }
-  }, [backendState, configured])
+    if (backendState === 'offline') return { className: 'offline', label: t('backendOffline') }
+    if (backendState === 'online' && !configured) return { className: 'pending', label: t('backendPending') }
+    if (backendState === 'online') return { className: 'online', label: t('backendOnline') }
+    return { className: 'checking', label: t('backendChecking') }
+  }, [backendState, configured, t])
+
+  const navItems = useMemo<NavItem[]>(() => [
+    { key: 'painel', label: t('menuDashboard'), hint: t('hintDashboard'), icon: 'book' },
+    { key: 'kindle', label: t('menuKindle'), hint: t('hintKindle'), icon: 'kindle' },
+    { key: 'logins', label: t('menuLogins'), hint: t('hintLogins'), icon: 'login' },
+    { key: 'configuracoes', label: t('menuSettings'), hint: t('hintSettings'), icon: 'settings' },
+  ], [t])
+
+  const activeNav = navItems.find((item) => item.key === nav) ?? navItems[0]
+
+  function showMessage(nextNav: NavKey, value: string): void {
+    setNoticeNav(nextNav)
+    setMessage(value)
+    setError(null)
+  }
+
+  function showError(nextNav: NavKey, value: string): void {
+    setNoticeNav(nextNav)
+    setError(value)
+    setMessage(null)
+  }
+
+  function clearNotice(nextNav?: NavKey): void {
+    setNoticeNav(nextNav ?? null)
+    setMessage(null)
+    setError(null)
+  }
 
   function updateForm<K extends keyof ConfigForm>(key: K, value: ConfigForm[K]): void {
     setForm((current) => current ? { ...current, [key]: value } : current)
@@ -405,19 +766,32 @@ export default function App(): React.JSX.Element {
     if (!form) return null
 
     setSaving(true)
-    setError(null)
-    setMessage(null)
+    clearNotice('kindle')
     try {
       const saved = await window.dashboard.saveConfig(inputFromForm(form))
       setConfig(saved)
       setForm(formFromConfig(saved))
-      setMessage('Configuração salva')
+      showMessage('kindle', t('configSaved'))
       return saved
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError))
+      showError('kindle', saveError instanceof Error ? saveError.message : String(saveError))
       return null
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSaveLanguage(language: LanguagePreference): Promise<void> {
+    setSavingLanguage(true)
+    clearNotice('configuracoes')
+    try {
+      const saved = await window.dashboard.setLanguage(language)
+      setConfig(saved)
+      showMessage('configuracoes', COPY[resolveLanguage(saved.language, runtime?.systemLanguage)].languageSaved)
+    } catch (languageError) {
+      showError('configuracoes', languageError instanceof Error ? languageError.message : String(languageError))
+    } finally {
+      setSavingLanguage(false)
     }
   }
 
@@ -426,21 +800,19 @@ export default function App(): React.JSX.Element {
     if (!saved) return
 
     setCheckingKindle(true)
-    setError(null)
-    setMessage(null)
+    clearNotice('kindle')
     try {
       const status = await window.dashboard.checkKindle()
       setKindle(status)
-      setMessage(status.detail)
+      showMessage('kindle', status.detail)
       if (status.connected) {
         const scriptStatus = await window.dashboard.getKindleScriptStatus()
         setKindleScript(scriptStatus)
         setInstallOutput(scriptStatus.output)
       }
       setNav('kindle')
-      setKindleTab('diagnostico')
     } catch (kindleError) {
-      setError(kindleError instanceof Error ? kindleError.message : String(kindleError))
+      showError('kindle', kindleError instanceof Error ? kindleError.message : String(kindleError))
     } finally {
       setCheckingKindle(false)
     }
@@ -451,8 +823,7 @@ export default function App(): React.JSX.Element {
     if (!saved) return
 
     setInstalling(true)
-    setError(null)
-    setMessage(null)
+    clearNotice('kindle')
     setInstallOutput(null)
     try {
       const result = await window.dashboard.installKindle()
@@ -460,28 +831,25 @@ export default function App(): React.JSX.Element {
       setForm(formFromConfig(result.config))
       setInstallOutput(result.output)
       setKindleScript(result.status)
-      setMessage('Scripts instalados no Kindle')
+      showMessage('kindle', t('scriptsInstalled'))
       setNav('painel')
       await refreshAuth()
     } catch (installError) {
-      setError(installError instanceof Error ? installError.message : String(installError))
+      showError('kindle', installError instanceof Error ? installError.message : String(installError))
     } finally {
       setInstalling(false)
     }
   }
 
   async function handleUninstallKindle(): Promise<void> {
-    const confirmed = window.confirm(
-      'Desinstalar os scripts do Kindle? O autostart do dashboard será removido do aparelho.',
-    )
+    const confirmed = window.confirm(t('uninstallConfirm'))
     if (!confirmed) return
 
     const saved = await saveCurrentConfig()
     if (!saved) return
 
     setUninstalling(true)
-    setError(null)
-    setMessage(null)
+    clearNotice('kindle')
     setInstallOutput(null)
     try {
       const result = await window.dashboard.uninstallKindle()
@@ -489,9 +857,9 @@ export default function App(): React.JSX.Element {
       setForm(formFromConfig(result.config))
       setInstallOutput(result.output)
       setKindleScript(result.status)
-      setMessage('Scripts desinstalados do Kindle')
+      showMessage('kindle', t('scriptsRemoved'))
     } catch (uninstallError) {
-      setError(uninstallError instanceof Error ? uninstallError.message : String(uninstallError))
+      showError('kindle', uninstallError instanceof Error ? uninstallError.message : String(uninstallError))
     } finally {
       setUninstalling(false)
     }
@@ -499,17 +867,16 @@ export default function App(): React.JSX.Element {
 
   async function handleKindleScript(action: 'start' | 'stop'): Promise<void> {
     setScriptAction(action)
-    setError(null)
-    setMessage(null)
+    clearNotice('kindle')
     try {
       const status = action === 'start'
         ? await window.dashboard.startKindleScript()
         : await window.dashboard.stopKindleScript()
       setKindleScript(status)
       setInstallOutput(status.output)
-      setMessage(action === 'start' ? 'Script iniciado no Kindle' : 'Script parado no Kindle')
+      showMessage('kindle', action === 'start' ? t('scriptStarted') : t('scriptStopped'))
     } catch (scriptError) {
-      setError(scriptError instanceof Error ? scriptError.message : String(scriptError))
+      showError('kindle', scriptError instanceof Error ? scriptError.message : String(scriptError))
     } finally {
       setScriptAction(null)
     }
@@ -517,29 +884,27 @@ export default function App(): React.JSX.Element {
 
   async function handleRender(): Promise<void> {
     setRendering(true)
-    setError(null)
+    clearNotice('painel')
     try {
       const result = await window.dashboard.renderNow()
       setLastRender(result.updatedAt)
       setPreviewKey(Date.now())
     } catch (renderError) {
-      setError(renderError instanceof Error ? renderError.message : String(renderError))
+      showError('painel', renderError instanceof Error ? renderError.message : String(renderError))
     } finally {
       setRendering(false)
     }
   }
 
   async function handleOpenLogin(tool: AuthLoginTool): Promise<void> {
-    setError(null)
+    clearNotice('logins')
     try {
       await window.dashboard.openLogin(tool)
-      setMessage(tool === 'claude' ? 'Janela de login do Claude aberta' : 'Janela de login do Codex aberta')
+      showMessage('logins', tool === 'claude' ? t('sourceLoginOpenedClaude') : t('sourceLoginOpenedCodex'))
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : String(loginError))
+      showError('logins', loginError instanceof Error ? loginError.message : String(loginError))
     }
   }
-
-  const activeNav = NAV_ITEMS.find((item) => item.key === nav) ?? NAV_ITEMS[0]
 
   return (
     <div className="app-shell">
@@ -547,13 +912,13 @@ export default function App(): React.JSX.Element {
         <div className="brand">
           <span className="brand-mark">K</span>
           <div>
-            <p className="brand-eyebrow">Kindle Paperwhite</p>
-            <strong className="brand-title">Dashboard</strong>
+            <p className="brand-eyebrow">{t('panelBrandEyebrow')}</p>
+            <strong className="brand-title">{t('panelBrandTitle')}</strong>
           </div>
         </div>
 
         <nav className="nav">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const locked = item.key === 'painel' && !configured
             return (
               <button
@@ -562,7 +927,7 @@ export default function App(): React.JSX.Element {
                 className={`nav-item ${nav === item.key ? 'active' : ''}`}
                 onClick={() => setNav(item.key)}
                 disabled={locked}
-                title={locked ? 'Configure o Kindle primeiro' : item.hint}
+                title={locked ? t('configureKindleFirst') : item.hint}
               >
                 <span className="nav-icon" aria-hidden="true"><Icon name={item.icon} /></span>
                 <span className="nav-text">
@@ -585,8 +950,8 @@ export default function App(): React.JSX.Element {
               <span>Alex Ishida</span>
               <ActionButton
                 className="icon-link"
-                title="Abrir repositório no GitHub"
-                aria-label="Abrir repositório no GitHub"
+                title={t('githubOpen')}
+                aria-label={t('githubOpen')}
                 onClick={() => void window.dashboard.openRepo()}
                 icon="github"
                 iconOnly
@@ -607,14 +972,14 @@ export default function App(): React.JSX.Element {
             <>
               <div className="topbar-meta">
                 <span className="meta-item">
-                  <span className="meta-key">Última imagem</span>
-                  <span className="meta-val">{formatTime(lastRender)}</span>
+                  <span className="meta-key">{t('lastImage')}</span>
+                  <span className="meta-val">{formatTime(lastRender, activeLanguage, t('loading'))}</span>
                 </span>
               </div>
 
               <div className="actions">
                 <ActionButton icon="refresh" onClick={() => void handleRender()} disabled={rendering || !runtime}>
-                  {rendering ? 'Atualizando...' : 'Atualizar agora'}
+                  {rendering ? t('refreshNowBusy') : t('refreshNow')}
                 </ActionButton>
               </div>
             </>
@@ -622,18 +987,62 @@ export default function App(): React.JSX.Element {
         </header>
 
         <main className="content">
+          {(message || error) && noticeNav === nav ? (
+            <section className="global-notices">
+              {message ? <div className="notice ok">{message}</div> : null}
+              {error ? <div className="notice error">{error}</div> : null}
+            </section>
+          ) : null}
+
           {nav === 'painel' && configured ? (
             <section className="dashboard-grid">
               <section className="preview-wrap">
                 <section className="preview-panel">
                   {runtime ? (
-                    <PreviewFrame baseUrl={runtime.baseUrl} previewKey={previewKey} />
+                    <PreviewFrame baseUrl={runtime.baseUrl} language={activeLanguage} previewKey={previewKey} />
                   ) : (
-                    <div className="loading">Iniciando o dashboard...</div>
+                    <div className="loading">{t('appLoading')}</div>
                   )}
                 </section>
-                {error ? <div className="notice error preview-error">{error}</div> : null}
               </section>
+            </section>
+          ) : null}
+
+          {nav === 'configuracoes' ? (
+            <section className="single-grid settings-stack">
+              <section className="panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">{t('languageSectionEyebrow')}</p>
+                    <h2>{t('languageSectionTitle')}</h2>
+                  </div>
+                </div>
+
+                <label className="wide-field">
+                  <span>{t('languageField')}</span>
+                  <select
+                    value={config?.language ?? 'system'}
+                    onChange={(event) => void handleSaveLanguage(event.target.value as LanguagePreference)}
+                    disabled={savingLanguage || !config}
+                  >
+                    <option value="system">{t('languageAuto')}</option>
+                    <option value="en">English</option>
+                    <option value="pt-BR">Português (Brasil)</option>
+                    <option value="es">Español</option>
+                  </select>
+                </label>
+
+                <p className="field-note standalone-note">
+                  {t('languageDetected', {
+                    value: runtime?.systemLanguage === 'pt-BR'
+                      ? 'Português (Brasil)'
+                      : runtime?.systemLanguage === 'es'
+                        ? 'Español'
+                        : 'English',
+                  })}
+                </p>
+              </section>
+
             </section>
           ) : null}
 
@@ -647,7 +1056,7 @@ export default function App(): React.JSX.Element {
                   onClick={() => setKindleTab('config')}
                   icon="settings"
                 >
-                  Configuração
+                  {t('configSectionTitle')}
                 </ActionButton>
                 <ActionButton
                   role="tab"
@@ -656,7 +1065,7 @@ export default function App(): React.JSX.Element {
                   onClick={() => setKindleTab('diagnostico')}
                   icon="stethoscope"
                 >
-                  Diagnóstico e Instalação de Scripts
+                  {t('diagnosticsInstall')}
                 </ActionButton>
               </div>
 
@@ -667,67 +1076,70 @@ export default function App(): React.JSX.Element {
                 }}>
                   <div className="panel-heading">
                     <div>
-                      <p className="eyebrow">Setup</p>
-                      <h2>Configuração do Kindle</h2>
+                      <p className="eyebrow">{t('configSectionEyebrow')}</p>
+                      <h2>{t('configSectionTitle')}</h2>
                     </div>
-                    <span className={`badge ${configured ? 'ok' : 'warn'}`}>{configured ? 'Pronto' : 'Pendente'}</span>
+                    <span className={`badge ${configured ? 'ok' : 'warn'}`}>
+                      {configured ? t('configBadgeReady') : t('configBadgePending')}
+                    </span>
                   </div>
 
                   <div className="field-grid">
                     <label>
-                      <span>IP do Kindle</span>
-                      <input value={form?.kindleIp ?? ''} onChange={(event) => updateForm('kindleIp', event.target.value)} placeholder="ex.: IP do Kindle" />
+                      <span>{t('fieldKindleIp')}</span>
+                      <input
+                        value={form?.kindleIp ?? ''}
+                        onChange={(event) => updateForm('kindleIp', event.target.value)}
+                        placeholder={t('fieldKindleIpPlaceholder')}
+                      />
                     </label>
                     <label>
-                      <span>Porta SSH</span>
+                      <span>{t('fieldPort')}</span>
                       <input value={form?.kindlePort ?? ''} onChange={(event) => updateForm('kindlePort', event.target.value)} inputMode="numeric" />
                     </label>
                     <label>
-                      <span>Usuário SSH</span>
+                      <span>{t('fieldUser')}</span>
                       <input value={form?.kindleUser ?? ''} onChange={(event) => updateForm('kindleUser', event.target.value)} />
                     </label>
                     <label>
-                      <span>Senha SSH</span>
+                      <span>{t('fieldPassword')}</span>
                       <input
                         value={form?.kindlePassword ?? ''}
                         onChange={(event) => updateForm('kindlePassword', event.target.value)}
-                        placeholder={config?.kindlePasswordSaved ? 'senha salva; preencha para trocar' : 'senha do Kindle'}
+                        placeholder={config?.kindlePasswordSaved ? t('fieldPasswordSaved') : t('fieldPasswordPlaceholder')}
                         type="password"
                       />
                     </label>
                   </div>
 
                   <label className="wide-field">
-                    <span>IP do PC</span>
+                    <span>{t('dashboardHost')}</span>
                     <input
                       value={dashboardHostFromUrl(form?.dashboardUrl ?? '')}
                       onChange={(event) => updateForm('dashboardUrl', dashboardUrlWithHost(form?.dashboardUrl ?? '', event.target.value))}
-                      placeholder="ex.: 192.168.0.10"
+                      placeholder={t('dashboardHostPlaceholder')}
                     />
-                    <small className="field-note">URL gerada: {dashboardUrlPreview || 'aguardando'}</small>
+                    <small className="field-note">{t('dashboardGeneratedUrl', { value: dashboardUrlPreview || t('loading') })}</small>
                   </label>
 
                   <div className="field-grid compact">
                     <label>
-                      <span>Download Kindle (segundos)</span>
+                      <span>{t('downloadInterval')}</span>
                       <input value={form?.kindleRefreshInterval ?? ''} onChange={(event) => updateForm('kindleRefreshInterval', event.target.value)} inputMode="numeric" />
                     </label>
                     <label>
-                      <span>Refresh completo (ciclos)</span>
+                      <span>{t('fullRefresh')}</span>
                       <input value={form?.kindleFullRefreshEvery ?? ''} onChange={(event) => updateForm('kindleFullRefreshEvery', event.target.value)} inputMode="numeric" />
                     </label>
                     <label>
-                      <span>Retry Wi-Fi (falhas seguidas)</span>
+                      <span>{t('fieldWifiRetry')}</span>
                       <input value={form?.kindleWifiRetryEvery ?? ''} onChange={(event) => updateForm('kindleWifiRetryEvery', event.target.value)} inputMode="numeric" />
                     </label>
                   </div>
 
                   <div className="button-row">
-                    <ActionButton type="submit" icon="save" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</ActionButton>
+                    <ActionButton type="submit" icon="save" disabled={saving}>{saving ? t('saving') : t('save')}</ActionButton>
                   </div>
-
-                  {message ? <div className="notice ok">{message}</div> : null}
-                  {error ? <div className="notice error">{error}</div> : null}
                 </form>
               ) : null}
 
@@ -737,11 +1149,11 @@ export default function App(): React.JSX.Element {
                     <header className="step-head">
                       <span className="step-num" aria-hidden="true">1</span>
                       <div className="step-info">
-                        <h2>Conectar e verificar</h2>
-                        <p className="step-sub">Confere SSH, jailbreak e ferramentas no aparelho.</p>
+                        <h2>{t('step1Title')}</h2>
+                        <p className="step-sub">{t('step1Sub')}</p>
                       </div>
                       <ActionButton className="ghost" icon="search" onClick={() => void handleCheckKindle()} disabled={checkingKindle || saving}>
-                        {checkingKindle ? 'Verificando...' : 'Verificar Kindle'}
+                        {checkingKindle ? t('checkingKindle') : t('checkKindle')}
                       </ActionButton>
                     </header>
 
@@ -750,19 +1162,19 @@ export default function App(): React.JSX.Element {
                         <div className={`conn-banner ${kindle.connected ? 'ok' : 'bad'}`}>
                           <span className="conn-dot" aria-hidden="true" />
                           <div className="conn-text">
-                            <strong>{kindle.connected ? 'Kindle conectado' : 'Kindle não encontrado'}</strong>
+                            <strong>{kindle.connected ? t('connectionReady') : t('connectionFail')}</strong>
                             <span>{kindle.detail}{kindle.model ? ` · ${kindle.model}` : ''}</span>
                           </div>
                         </div>
                         <div className="req-grid">
-                          <ReqChip ok={kindle.jailbroken} label="Jailbreak" desc="Acesso root liberado" />
-                          <ReqChip ok={kindle.fbink} label="FBInk" desc="Mostra a imagem na tela" />
-                          <ReqChip ok={kindle.hotfix} label="Hotfix" desc="Correção de inicialização" />
-                          <ReqChip ok={kindle.canInstall} label="Pronto" desc="Pode instalar os scripts" />
+                          <ReqChip ok={kindle.jailbroken} label="Jailbreak" desc={t('reqJailbreak')} />
+                          <ReqChip ok={kindle.fbink} label="FBInk" desc={t('reqFbink')} />
+                          <ReqChip ok={kindle.hotfix} label="Hotfix" desc={t('reqHotfix')} />
+                          <ReqChip ok={kindle.canInstall} label={t('configBadgeReady')} desc={t('reqReady')} />
                         </div>
                       </>
                     ) : (
-                      <p className="step-empty">Depois do jailbreak, ative USBNetwork/KUAL e toque em <strong>Verificar Kindle</strong>.</p>
+                      <p className="step-empty">{t('diagnosticEmpty')}</p>
                     )}
                   </section>
 
@@ -770,21 +1182,22 @@ export default function App(): React.JSX.Element {
                     <header className="step-head">
                       <span className="step-num" aria-hidden="true">2</span>
                       <div className="step-info">
-                        <h2>Instalar scripts</h2>
-                        <p className="step-sub">Coloca o autostart do dashboard no Kindle.</p>
+                        <h2>{t('step2Title')}</h2>
+                        <p className="step-sub">{t('step2Sub')}</p>
                       </div>
                       {kindleScript ? (
                         <span className={`badge ${kindleScript.installed ? 'ok' : 'warn'}`}>
-                          {kindleScript.installed ? 'Instalado' : 'Ausente'}
+                          {kindleScript.installed ? t('installed') : t('statusInstalledMissing')}
                         </span>
                       ) : null}
                     </header>
+
                     <div className="button-row">
                       <ActionButton icon="download" onClick={() => void handleInstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
-                        {installing ? 'Instalando...' : 'Instalar scripts'}
+                        {installing ? t('installing') : t('installScripts')}
                       </ActionButton>
                       <ActionButton className="ghost danger" icon="trash" onClick={() => void handleUninstallKindle()} disabled={saving || installing || uninstalling || checkingKindle || scriptAction !== null}>
-                        {uninstalling ? 'Desinstalando...' : 'Desinstalar'}
+                        {uninstalling ? t('uninstallBusy') : t('uninstall')}
                       </ActionButton>
                     </div>
                   </section>
@@ -793,19 +1206,19 @@ export default function App(): React.JSX.Element {
                     <header className="step-head">
                       <span className="step-num" aria-hidden="true">3</span>
                       <div className="step-info">
-                        <h2>Executar no Kindle</h2>
-                        <p className="step-sub">Liga ou desliga o loop que atualiza a tela.</p>
+                        <h2>{t('step3Title')}</h2>
+                        <p className="step-sub">{t('step3Sub')}</p>
                       </div>
                     </header>
 
                     {kindleScript ? (
                       <div className="exec-grid">
-                        <ExecPill ok={kindleScript.running} label="Loop" value={kindleScript.running ? 'Rodando' : 'Parado'} />
-                        <ExecPill ok={kindleScript.enabled} label="Autostart" value={kindleScript.enabled ? 'Ativo' : 'Inativo'} />
-                        <ExecPill ok={kindleScript.backendReachable} label="Backend" value={kindleScript.backendReachable ? 'Acessível' : 'Indisponível'} />
+                        <ExecPill ok={kindleScript.running} label={t('loop')} value={kindleScript.running ? t('loopRunning') : t('loopStopped')} />
+                        <ExecPill ok={kindleScript.enabled} label={t('autostart')} value={kindleScript.enabled ? t('autostartActive') : t('autostartInactive')} />
+                        <ExecPill ok={kindleScript.backendReachable} label={t('backend')} value={kindleScript.backendReachable ? t('ok') : t('backendOffline')} />
                       </div>
                     ) : (
-                      <p className="step-empty">Verifique o Kindle para ver o estado do script.</p>
+                      <p className="step-empty">{t('diagnosticScriptEmpty')}</p>
                     )}
 
                     <div className="button-row">
@@ -814,7 +1227,7 @@ export default function App(): React.JSX.Element {
                         onClick={() => void handleKindleScript('start')}
                         disabled={!kindleScript?.installed || kindleScript.running || scriptAction !== null || installing || uninstalling || checkingKindle}
                       >
-                        {scriptAction === 'start' ? 'Iniciando...' : 'Iniciar script'}
+                        {scriptAction === 'start' ? t('starting') : t('startScript')}
                       </ActionButton>
                       <ActionButton
                         className="ghost"
@@ -822,19 +1235,17 @@ export default function App(): React.JSX.Element {
                         onClick={() => void handleKindleScript('stop')}
                         disabled={!kindleScript?.running || scriptAction !== null || installing || uninstalling || checkingKindle}
                       >
-                        {scriptAction === 'stop' ? 'Parando...' : 'Parar script'}
+                        {scriptAction === 'stop' ? t('stopping') : t('stopScript')}
                       </ActionButton>
                     </div>
                   </section>
 
                   {installOutput ? (
                     <details className="tech-log">
-                      <summary>Detalhes técnicos</summary>
+                      <summary>{t('detailsTechnical')}</summary>
                       <pre className="output-log">{installOutput}</pre>
                     </details>
                   ) : null}
-                  {message ? <div className="notice ok">{message}</div> : null}
-                  {error ? <div className="notice error">{error}</div> : null}
                 </section>
               ) : null}
             </section>
@@ -845,11 +1256,11 @@ export default function App(): React.JSX.Element {
               <section className="panel diagnostics-panel">
                 <div className="panel-heading">
                   <div>
-                    <p className="eyebrow">Diagnóstico</p>
-                    <h2>Login das fontes</h2>
+                    <p className="eyebrow">{t('authEyebrow')}</p>
+                    <h2>{t('authTitle')}</h2>
                   </div>
                   <ActionButton className="ghost" icon="refresh" onClick={() => void refreshAuth()} disabled={checkingAuth}>
-                    {checkingAuth ? 'Checando...' : 'Reverificar'}
+                    {checkingAuth ? t('authChecking') : t('authRecheck')}
                   </ActionButton>
                 </div>
 
@@ -858,7 +1269,7 @@ export default function App(): React.JSX.Element {
                     const action = sourceAction(source)
                     return (
                       <div className="status-row" key={source.name}>
-                        <span className={`badge ${source.ok ? 'ok' : 'warn'}`}>{statusLabel(source.ok)}</span>
+                        <span className={`badge ${source.ok ? 'ok' : 'warn'}`}>{source.ok ? t('ok') : t('action')}</span>
                         <div>
                           <strong>{source.label}</strong>
                           <p>{source.detail}</p>
@@ -866,17 +1277,14 @@ export default function App(): React.JSX.Element {
                         </div>
                         {action ? (
                           <ActionButton className="ghost" icon="login" onClick={() => void handleOpenLogin(action)}>
-                            Login
+                            {t('loginButton')}
                           </ActionButton>
                         ) : null}
                       </div>
                     )
                   })}
-                  {!auth ? <p className="muted">Carregando status de autenticação...</p> : null}
+                  {!auth ? <p className="muted">{t('authLoading')}</p> : null}
                 </div>
-
-                {message ? <div className="notice ok">{message}</div> : null}
-                {error ? <div className="notice error">{error}</div> : null}
               </section>
             </section>
           ) : null}

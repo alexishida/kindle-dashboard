@@ -5,6 +5,7 @@ const NATIVE_HEIGHT = 1072
 
 interface PreviewFrameProps {
   baseUrl: string
+  language: 'en' | 'pt-BR' | 'es'
   previewKey: number
 }
 
@@ -14,7 +15,7 @@ interface PreviewFrameProps {
  * para `1448*scale x 1072*scale`; dimensionamos o iframe igual, sem transform,
  * garantindo encaixe exato sem corte.
  */
-export default function PreviewFrame({ baseUrl, previewKey }: PreviewFrameProps): React.JSX.Element {
+export default function PreviewFrame({ baseUrl, language, previewKey }: PreviewFrameProps): React.JSX.Element {
   const stageRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0)
 
@@ -43,7 +44,7 @@ export default function PreviewFrame({ baseUrl, previewKey }: PreviewFrameProps)
           key={`${previewKey}-${scale}`}
           className="preview-frame"
           title="Previa do dashboard"
-          src={`${baseUrl}/render?captureScale=${scale}&preview=${previewKey}`}
+          src={`${baseUrl}/render?captureScale=${scale}&preview=${previewKey}&lang=${encodeURIComponent(language)}`}
           style={{ width: NATIVE_WIDTH * scale, height: NATIVE_HEIGHT * scale }}
         />
       ) : null}

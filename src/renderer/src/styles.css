@@ -44,7 +44,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -114,7 +115,8 @@ button.ghost:hover:not(:disabled) {
   gap: 0;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line-2);
@@ -130,9 +132,14 @@ input::placeholder {
   color: var(--text-soft);
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+select {
+  appearance: none;
 }
 
 label span {
@@ -148,6 +155,10 @@ label small.field-note {
   margin-top: 7px;
   color: var(--text-soft);
   font-size: 11px;
+}
+
+.field-note.standalone-note {
+  margin: 10px 0 0;
 }
 
 h1,
@@ -245,6 +256,7 @@ h3 {
 .nav-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   min-height: 50px;
   border: 1px solid transparent;
@@ -448,8 +460,21 @@ h3 {
   padding: 22px;
 }
 
+.global-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 .single-grid {
   max-width: 760px;
+}
+
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .subtabs {
@@ -464,6 +489,7 @@ h3 {
 
 .subtab {
   flex: 1;
+  justify-content: flex-start;
   min-height: 38px;
   border: 1px solid transparent;
   border-radius: 8px;

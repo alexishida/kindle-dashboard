@@ -97,21 +97,6 @@ To remove the Kindle autostart, use the **Uninstall Script** button in the
 **Kindle > Script Diagnostics and Installation** tab, or see the manual
 step-by-step in [KINDLE-INSTALLATION.md](KINDLE-INSTALLATION.md).
 
-### Privacy
-
-Do not commit:
-
-- Kindle serial number.
-- Real PC or Kindle IP.
-- SSH password.
-- Tokens, cookies, local databases, or session files.
-- `out/dash.png`, logs, builds, installers, and local configs.
-- Electron `.env` or `config.json` files.
-
-Sensitive data stays out of the renderer. The SSH password saved by the app
-lives in the Electron `userData` directory and uses `safeStorage` when
-available.
-
 ---
 
 ## Development Information

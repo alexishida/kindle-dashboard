@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here.
 
+## [v1.0.3](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-23
+
+Kindle Dashboard v1.0.3
+
+### Fixed
+
+- Fixed Codex local usage parsing so the dashboard keeps showing the live `7d` window even when `5h` data expires first or arrives in a different rollout event.
+
+### Tests
+
+- Added collector coverage for mixed Codex rollout cases, including weekly window recovery and `window_minutes`-based naming.
+
+### Version
+
+- App version bumped to `1.0.3`.
+
 ## [v1.0.2](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-22
 
 Kindle Dashboard v1.0.2

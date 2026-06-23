@@ -14,6 +14,7 @@ const ROOTS = [
   path.join(CODEX_DIR, 'sessions'),
   path.join(CODEX_DIR, 'archived_sessions'),
 ];
+const EXPECTED_WINDOWS = ['5h', '7d'];
 
 function rolloutsByRecency() {
   const out = [];
@@ -42,17 +43,56 @@ function* tokenCountsDesc(file) {
   }
 }
 
-function pctWindow(rl, key, name) {
-  const w = rl && rl[key];
-  if (!w) return null;
-  const out = { name, pct: w.used_percent };
-  if (w.resets_at) out.resets_at = new Date(w.resets_at * 1000).toISOString();
+function resetMsForWindow(w) {
+  const resetAt = Number(w && w.resets_at);
+  return Number.isFinite(resetAt) && resetAt > 0 ? resetAt * 1000 : null;
+}
+
+function windowName(key, w) {
+  const minutes = Number(
+    w && w.window_minutes != null
+      ? w.window_minutes
+      : w && w.window_seconds != null
+        ? w.window_seconds / 60
+        : NaN
+  );
+  if (minutes === 300) return '5h';
+  if (minutes === 10080) return '7d';
+  if (key === 'primary') return '5h';
+  if (key === 'secondary') return '7d';
+  return key;
+}
+
+function limitWindows(rateLimits) {
+  if (!rateLimits) return [];
+  const out = [];
+  for (const [key, w] of Object.entries(rateLimits)) {
+    if (!w || typeof w !== 'object') continue;
+    const pct = Number(w.used_percent);
+    if (!Number.isFinite(pct)) continue;
+    const resetMs = resetMsForWindow(w);
+    const item = { name: windowName(key, w), pct, resetMs };
+    if (resetMs) item.resets_at = new Date(resetMs).toISOString();
+    out.push(item);
+  }
   return out;
 }
 
-function primaryResetMs(rateLimits) {
-  const resetAt = rateLimits && rateLimits.primary && rateLimits.primary.resets_at;
-  return resetAt ? resetAt * 1000 : null;
+function publicWindow(w) {
+  const out = { name: w.name, pct: w.pct };
+  if (w.resets_at) out.resets_at = w.resets_at;
+  return out;
+}
+
+function orderedWindows(windowsByName) {
+  const out = [];
+  for (const name of EXPECTED_WINDOWS) {
+    if (windowsByName.has(name)) out.push(publicWindow(windowsByName.get(name)));
+  }
+  for (const [name, w] of windowsByName) {
+    if (!EXPECTED_WINDOWS.includes(name)) out.push(publicWindow(w));
+  }
+  return out;
 }
 
 async function collect() {
@@ -60,47 +100,41 @@ async function collect() {
     const files = rolloutsByRecency();
     if (!files.length) throw new Error('nenhum rollout encontrado');
 
-    let liveRateLimits = null;
-    let staleRateLimits = null;
+    const liveWindows = new Map();
+    const staleWindows = new Map();
     let totalTokens = null;
     const now = Date.now();
 
-    // varre do mais recente; para cedo se ja tivermos tokens + limite vivo
+    // Varre do mais recente; janelas podem aparecer separadas em eventos diferentes.
     for (const f of files) {
       for (const tc of tokenCountsDesc(f)) {
-        if (!totalTokens && tc.info && tc.info.total_token_usage) {
+        if (totalTokens == null && tc.info && tc.info.total_token_usage) {
           totalTokens = tc.info.total_token_usage.total_tokens;
         }
-        if (tc.rate_limits && (tc.rate_limits.primary || tc.rate_limits.secondary)) {
-          const reset5h = primaryResetMs(tc.rate_limits);
-          if (!liveRateLimits && reset5h && reset5h > now) {
-            liveRateLimits = tc.rate_limits;
-          } else if (!staleRateLimits) {
-            staleRateLimits = tc.rate_limits;
+        for (const w of limitWindows(tc.rate_limits)) {
+          if (w.resetMs && w.resetMs > now) {
+            if (!liveWindows.has(w.name)) liveWindows.set(w.name, w);
+          } else if (!staleWindows.has(w.name)) {
+            staleWindows.set(w.name, w);
           }
         }
-        if (liveRateLimits && totalTokens != null) break;
+        if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
       }
-      if (liveRateLimits && totalTokens != null) break;
+      if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
     }
 
-    const rateLimits = liveRateLimits || staleRateLimits;
-    if (!rateLimits && totalTokens == null) throw new Error('sem token_count utilizavel');
+    if (!liveWindows.size && !staleWindows.size && totalTokens == null) throw new Error('sem token_count utilizavel');
 
     const tool = { tool: 'codex', label: 'OpenAI Codex', windows: [], confidence: 'live' };
     if (totalTokens != null) tool.tokens = { total: totalTokens };
 
-    // Honestidade: rate_limit local so vale enquanto janela nao resetou. Se reset_at
-    // da janela 5h ja passou, dado ficou velho (Codex usado pela web/app, nao pelo CLI).
-    const reset5h = primaryResetMs(rateLimits);
-    if (rateLimits && reset5h && reset5h > now) {
-      const w5 = pctWindow(rateLimits, 'primary', '5h');
-      const w7 = pctWindow(rateLimits, 'secondary', '7d');
-      if (w5) tool.windows.push(w5);
-      if (w7) tool.windows.push(w7);
-    } else if (rateLimits) {
+    // Honestidade: cada janela local so vale enquanto seu reset_at ainda e futuro.
+    if (liveWindows.size) {
+      tool.windows = orderedWindows(liveWindows);
+    } else if (staleWindows.size) {
+      const staleSince = Math.max(...Array.from(staleWindows.values()).map((w) => w.resetMs || 0));
       tool.confidence = 'stale';
-      tool.staleSince = reset5h ? new Date(reset5h).toISOString() : null;
+      tool.staleSince = staleSince ? new Date(staleSince).toISOString() : null;
       tool.noteKey = 'codexStale';
     } else {
       tool.confidence = 'partial';

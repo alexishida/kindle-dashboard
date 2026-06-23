@@ -52,6 +52,8 @@ function defaultWidth(): number {
 
 function openPipWindow(): void {
   if (pipWindow && !pipWindow.isDestroyed()) {
+    pipWindow.setAlwaysOnTop(true, 'screen-saver')
+    pipWindow.moveTop()
     pipWindow.show()
     pipWindow.focus()
     return
@@ -85,9 +87,19 @@ function openPipWindow(): void {
   })
 
   window.setAspectRatio(ASPECT)
-  window.setAlwaysOnTop(true, 'floating')
+  // Use highest regular always-on-top level so PiP stays above normal app windows.
+  window.setAlwaysOnTop(true, 'screen-saver')
+  window.moveTop()
   secureWindow(window, BASE_URL)
 
+  window.on('show', () => {
+    window.setAlwaysOnTop(true, 'screen-saver')
+    window.moveTop()
+  })
+  window.on('focus', () => {
+    window.setAlwaysOnTop(true, 'screen-saver')
+    window.moveTop()
+  })
   window.on('resize', () => {
     if (resizeTimer) clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {

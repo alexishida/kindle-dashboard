@@ -84,12 +84,14 @@
 <script>
 (function () {
   var params = new URLSearchParams(location.search);
-  var requestedLanguage = params.get('lang') || 'en';
-  var lang = requestedLanguage === 'pt-BR' || requestedLanguage === 'es' ? requestedLanguage : 'en';
+  var lang = params.get('lang') || 'en';
   var API = '/api/usage';
 
-  var COPY = {
-    en: {
+  // Fallback minimo em ingles: garante que o PNG renderize mesmo se /api/i18n falhar.
+  var FALLBACK = {
+    locale: 'en-US',
+    currency: 'USD',
+    copy: {
       title: 'Token Dashboard',
       resetAt: 'Resets',
       unavailable: 'unavailable',
@@ -105,51 +107,17 @@
       tokens: 'Tokens',
       sessions: 'sessions',
       goLimits: 'Go plan limits without API',
-    },
-    'pt-BR': {
-      title: 'Dashboard de Tokens',
-      resetAt: 'Reinicia',
-      unavailable: 'indisponivel',
-      tokenExpired: 'token expirado - rode `claude`',
-      limitReached: 'limite atingido - aguardando',
-      cooldown: 'aguardando intervalo',
-      unavailableFallback: 'indisponivel',
-      extraUsage: 'Uso extra',
-      currentBalance: 'Saldo atual',
-      spent: 'Gasto',
-      monthlyLimit: 'Limite mensal',
-      used: 'usado',
-      tokens: 'Tokens',
-      sessions: 'sessoes',
-      goLimits: 'limites do Go sem API',
-    },
-    es: {
-      title: 'Panel de Tokens',
-      resetAt: 'Reinicia',
-      unavailable: 'no disponible',
-      tokenExpired: 'token vencido - ejecute `claude`',
-      limitReached: 'limite alcanzado - esperando',
-      cooldown: 'esperando intervalo',
-      unavailableFallback: 'no disponible',
-      extraUsage: 'Uso extra',
-      currentBalance: 'Saldo actual',
-      spent: 'Gasto',
-      monthlyLimit: 'Limite mensual',
-      used: 'usado',
-      tokens: 'Tokens',
-      sessions: 'sesiones',
-      goLimits: 'limites del plan Go sin API',
+      codexStale: 'local limits outdated (Codex used outside the CLI)'
     }
   };
 
-  var LOCALE = {
-    en: 'en-US',
-    'pt-BR': 'pt-BR',
-    es: 'es-ES'
-  };
+  // Preenchido por /api/i18n (namespace dashboard + meta). Veja locales/.
+  var i18n = FALLBACK;
 
-  document.documentElement.lang = lang;
-  document.getElementById('title').textContent = COPY[lang].title;
+  function copy(key) {
+    if (i18n.copy && i18n.copy[key] != null) return i18n.copy[key];
+    return FALLBACK.copy[key] != null ? FALLBACK.copy[key] : key;
+  }
 
   var LOGOS = {
     claude: '<svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><g stroke="#000" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="12" x2="12.00" y2="2.00"/><line x1="12" y1="12" x2="15.68" y2="6.28"/><line x1="12" y1="12" x2="20.37" y2="8.18"/><line x1="12" y1="12" x2="19.13" y2="13.02"/><line x1="12" y1="12" x2="19.41" y2="18.42"/><line x1="12" y1="12" x2="13.86" y2="18.33"/><line x1="12" y1="12" x2="9.32" y2="21.12"/><line x1="12" y1="12" x2="6.71" y2="16.58"/><line x1="12" y1="12" x2="2.70" y2="13.34"/><line x1="12" y1="12" x2="5.72" y2="9.13"/><line x1="12" y1="12" x2="7.19" y2="4.51"/></g></svg>',
@@ -157,7 +125,7 @@
   };
 
   function locale() {
-    return LOCALE[lang] || LOCALE.en;
+    return i18n.locale || 'en-US';
   }
 
   function percent(value) {
@@ -169,7 +137,7 @@
 
   function money(cents, cur) {
     var amount = cents / 100;
-    var currency = cur || (lang === 'pt-BR' ? 'BRL' : 'USD');
+    var currency = cur || i18n.currency || 'USD';
     try {
       return new Intl.NumberFormat(locale(), {
         style: 'currency',
@@ -184,7 +152,7 @@
     if (!value) return '';
     var d = new Date(value);
     if (isNaN(d.getTime())) return '';
-    return COPY[lang].resetAt + ': <strong>' +
+    return copy('resetAt') + ': <strong>' +
       d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: 'numeric' }) +
       ' ' +
       d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) +
@@ -206,30 +174,30 @@
     var h = '<div class="card"><h2>' + logo + '<span>' + t.label + '</span></h2>';
     if (t.confidence === 'error' || t.confidence === 'cooldown') {
       var e = t.error || '';
-      var msg = /401/.test(e) ? COPY[lang].tokenExpired
-              : /429/.test(e) ? COPY[lang].limitReached
-              : t.confidence === 'cooldown' ? COPY[lang].cooldown
-              : (e || COPY[lang].unavailableFallback);
-      return h + '<div class="sub" style="margin-top:24px">! ' + COPY[lang].unavailable + '</div>' +
+      var msg = /401/.test(e) ? copy('tokenExpired')
+              : /429/.test(e) ? copy('limitReached')
+              : t.confidence === 'cooldown' ? copy('cooldown')
+              : (e || copy('unavailableFallback'));
+      return h + '<div class="sub" style="margin-top:24px">! ' + copy('unavailable') + '</div>' +
              '<div class="sub dim">' + msg + '</div></div>';
     }
     (t.windows || []).forEach(function (w) { h += bar(w.name, w.pct, w.resets_at); });
-    if (t.note) h += '<div class="sub dim">! ' + t.note + '</div>';
+    if (t.noteKey) h += '<div class="sub dim">! ' + copy(t.noteKey) + '</div>';
     if (t.extra) {
-      h += '<div class="sub">' + COPY[lang].extraUsage + '</div>';
+      h += '<div class="sub">' + copy('extraUsage') + '</div>';
       if (typeof t.extra.current_balance === 'number') {
-        h += '<div class="sub">' + COPY[lang].currentBalance + ': ' + money(t.extra.current_balance, t.extra.currency) + '</div>';
+        h += '<div class="sub">' + copy('currentBalance') + ': ' + money(t.extra.current_balance, t.extra.currency) + '</div>';
       }
-      h += '<div class="sub">' + COPY[lang].spent + ': ' + money(t.extra.used_credits, t.extra.currency) +
-           ' · ' + COPY[lang].monthlyLimit + ': ' + money(t.extra.monthly_limit, t.extra.currency) +
-           '<br>(' + percent(t.extra.pct) + ' ' + COPY[lang].used + ')</div>';
+      h += '<div class="sub">' + copy('spent') + ': ' + money(t.extra.used_credits, t.extra.currency) +
+           ' · ' + copy('monthlyLimit') + ': ' + money(t.extra.monthly_limit, t.extra.currency) +
+           '<br>(' + percent(t.extra.pct) + ' ' + copy('used') + ')</div>';
     }
     if (t.tokens) {
-      h += '<div class="sub">' + COPY[lang].tokens + ': ' + t.tokens.total.toLocaleString(locale()) + '</div>';
+      h += '<div class="sub">' + copy('tokens') + ': ' + t.tokens.total.toLocaleString(locale()) + '</div>';
     }
     if (t.spend) {
       h += '<div class="big">' + money(Math.round(t.spend.usd * 100), 'USD') + '</div>' +
-           '<div class="sub dim">' + t.spend.sessions + ' ' + COPY[lang].sessions + ' · ' + COPY[lang].goLimits + '</div>';
+           '<div class="sub dim">' + t.spend.sessions + ' ' + copy('sessions') + ' · ' + copy('goLimits') + '</div>';
     }
     return h + '</div>';
   }
@@ -242,14 +210,34 @@
     document.title = 'READY';
   }
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', API + '?_=' + Date.now(), true);
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status < 300) {
-      render(JSON.parse(xhr.responseText));
+  function getJSON(url, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { cb(JSON.parse(xhr.responseText)); return; } catch (_error) {}
+      }
+      cb(null);
+    };
+    xhr.send();
+  }
+
+  // Carrega i18n primeiro (texto/locale/moeda); depois os dados e renderiza.
+  document.documentElement.lang = lang;
+  getJSON('/api/i18n?lang=' + encodeURIComponent(lang), function (data) {
+    if (data && data.dashboard) {
+      i18n = {
+        locale: (data.meta && data.meta.locale) || 'en-US',
+        currency: (data.meta && data.meta.currency) || 'USD',
+        copy: data.dashboard
+      };
     }
-  };
-  xhr.send();
+    document.getElementById('title').textContent = copy('title');
+    getJSON(API + '?_=' + Date.now(), function (usage) {
+      if (usage) render(usage);
+    });
+  });
 })();
 </script>
 </body>

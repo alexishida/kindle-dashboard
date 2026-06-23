@@ -1,4 +1,6 @@
-export type SupportedLanguage = 'en' | 'pt-BR' | 'es'
+// A BCP-47-ish language code backed by a file in `locales/`. Kept as a string so
+// contributors can add a language by dropping in a JSON file — no code changes.
+export type SupportedLanguage = string
 
 export type LanguagePreference = SupportedLanguage | 'system'
 
@@ -44,8 +46,9 @@ export interface DashboardConfigInput {
 }
 
 export interface AuthSourceStatus {
-  detail: string
-  hint?: string
+  detailKey: string
+  detailVars?: Record<string, string>
+  hintKey?: string
   label: string
   name: string
   ok: boolean

@@ -104,6 +104,18 @@ Sensitive data stays out of the renderer. The SSH password saved by the app live
 - Evitar dependencias novas sem necessidade clara.
 - Nao usar Python como dependencia operacional.
 
+## Encoding e i18n
+
+- Todo arquivo de texto do projeto deve ser UTF-8 sem BOM.
+- Scripts `.sh` do Kindle devem usar fim de linha LF (rodam no Linux do aparelho).
+- `.editorconfig` e `.gitattributes` mantem esse padrao; nao commitar arquivo com
+  BOM, mojibake ou `.sh` em CRLF.
+- Strings traduziveis (UI, tray, notificacoes, checagem de login, texto do PNG)
+  ficam em `locales/<idioma>.json`, nunca hardcoded no codigo.
+- Adicionar idioma = adicionar um arquivo em `locales/`; nao editar TypeScript
+  para isso. Chave faltando cai para `en.json`.
+- Codigo (main, backend, renderer) referencia chaves de i18n, nao texto final.
+
 ## UI
 
 - A UI Electron deve ser operacional, nao landing page.

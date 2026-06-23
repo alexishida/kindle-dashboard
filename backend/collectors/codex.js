@@ -101,7 +101,7 @@ async function collect() {
     } else if (rateLimits) {
       tool.confidence = 'stale';
       tool.staleSince = reset5h ? new Date(reset5h).toISOString() : null;
-      tool.note = 'limites locais desatualizados (Codex usado fora do CLI)';
+      tool.noteKey = 'codexStale';
     } else {
       tool.confidence = 'partial';
     }

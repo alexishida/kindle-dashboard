@@ -11,6 +11,7 @@ files:
   - render/**/*
   - kindle/**/*
   - scripts/**/*
+  - locales/**/*
   - package.json
 
 extraResources:

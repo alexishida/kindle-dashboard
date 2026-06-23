@@ -67,6 +67,27 @@ test('codex collector prefers live rate limits over stale fallback', async () =>
       { name: '7d', pct: 1, resets_at: new Date((nowSeconds + 86400 * 3) * 1000).toISOString() },
     ]);
     assert.deepEqual(result.tokens, { total: 140748 });
+    assert.equal(result.noteKey, undefined);
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test('codex collector marks stale data with a translation key, not raw text', async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kindle-dashboard-codex-'));
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  try {
+    // janela 5h ja resetou (resets_at no passado) -> dado local desatualizado
+    writeRollout(homeDir, path.join('archived_sessions', 'rollout-stale.jsonl'), [
+      tokenCountEvent(120000, nowSeconds - 3600, nowSeconds + 86400, 90),
+    ]);
+
+    const collector = loadCollectorForHome(homeDir);
+    const result = await collector.collect();
+
+    assert.equal(result.confidence, 'stale');
+    assert.equal(result.noteKey, 'codexStale');
     assert.equal(result.note, undefined);
   } finally {
     fs.rmSync(homeDir, { recursive: true, force: true });

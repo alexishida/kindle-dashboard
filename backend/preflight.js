@@ -1,10 +1,12 @@
 // Preflight de autenticação — roda no start do servidor (e exposto em /api/auth).
 // Checagens LOCAIS apenas (lê expiração das credenciais; sem rede, sem risco de 429).
+// Não formata texto: devolve chaves i18n (detailKey/hintKey) resolvidas no app/CLI.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const H = os.homedir();
+const LOCALES_DIR = path.join(__dirname, '..', 'locales');
 
 function jwtExpMs(token) {
   try {
@@ -15,19 +17,22 @@ function jwtExpMs(token) {
   }
 }
 
+function iso(ms) {
+  return ms ? new Date(ms).toISOString() : '?';
+}
+
 function checkClaude() {
   const r = { name: 'claude', label: 'Claude Code' };
   try {
     const c = JSON.parse(fs.readFileSync(path.join(H, '.claude', '.credentials.json'), 'utf8'));
     const o = c.claudeAiOauth || {};
-    if (!o.accessToken) return { ...r, ok: false, detail: 'sem accessToken', hint: 'rode `claude` para logar' };
+    if (!o.accessToken) return { ...r, ok: false, detailKey: 'noToken', hintKey: 'claudeLogin' };
     if (o.expiresAt && o.expiresAt <= Date.now()) {
-      return { ...r, ok: false, detail: 'token expirado em ' + new Date(o.expiresAt).toISOString(),
-               hint: 'rode qualquer comando `claude` (a CLI renova o token sozinha)' };
+      return { ...r, ok: false, detailKey: 'expired', detailVars: { expiresAt: iso(o.expiresAt) }, hintKey: 'claudeRenew' };
     }
-    return { ...r, ok: true, detail: 'válido até ' + (o.expiresAt ? new Date(o.expiresAt).toISOString() : '?') };
+    return { ...r, ok: true, detailKey: 'valid', detailVars: { expiresAt: iso(o.expiresAt) } };
   } catch (e) {
-    return { ...r, ok: false, detail: String(e.message || e), hint: 'rode `claude` para logar no PC' };
+    return { ...r, ok: false, detailKey: 'error', detailVars: { message: String(e.message || e) }, hintKey: 'claudeLogin' };
   }
 }
 
@@ -36,14 +41,14 @@ function checkCodex() {
   try {
     const a = JSON.parse(fs.readFileSync(path.join(H, '.codex', 'auth.json'), 'utf8'));
     const tok = a.tokens && a.tokens.access_token;
-    if (!tok) return { ...r, ok: false, detail: 'sem access_token', hint: 'rode `codex login`' };
+    if (!tok) return { ...r, ok: false, detailKey: 'noToken', hintKey: 'codexLogin' };
     const exp = jwtExpMs(tok);
     if (exp && exp <= Date.now()) {
-      return { ...r, ok: false, detail: 'token expirado em ' + new Date(exp).toISOString(), hint: 'rode `codex login` (ou reabra o app Codex)' };
+      return { ...r, ok: false, detailKey: 'expired', detailVars: { expiresAt: iso(exp) }, hintKey: 'codexRenew' };
     }
-    return { ...r, ok: true, detail: 'válido até ' + (exp ? new Date(exp).toISOString() : '?') + ' (mode: ' + a.auth_mode + ')' };
+    return { ...r, ok: true, detailKey: 'validWithMode', detailVars: { expiresAt: iso(exp), mode: String(a.auth_mode) } };
   } catch (e) {
-    return { ...r, ok: false, detail: String(e.message || e), hint: 'rode `codex login`' };
+    return { ...r, ok: false, detailKey: 'error', detailVars: { message: String(e.message || e) }, hintKey: 'codexLogin' };
   }
 }
 
@@ -59,9 +64,9 @@ function checkOpenCode() {
       const a = JSON.parse(fs.readFileSync(path.join(H, '.local', 'share', 'opencode', 'auth.json'), 'utf8'));
       hasKey = Object.values(a).some((v) => v && v.key);
     } catch {}
-    return { ...r, ok: true, detail: 'DB local legível' + (hasKey ? ' + API key presente' : ' (sem auth.json — só leitura local)') };
+    return { ...r, ok: true, detailKey: hasKey ? 'opencodeReadableWithKey' : 'opencodeReadable' };
   } catch (e) {
-    return { ...r, ok: false, detail: 'DB não acessível: ' + String(e.message || e), hint: 'use o OpenCode ao menos 1x para criar o DB' };
+    return { ...r, ok: false, detailKey: 'opencodeUnavailable', detailVars: { message: String(e.message || e) }, hintKey: 'opencodeHint' };
   }
 }
 
@@ -69,17 +74,40 @@ function checkAll() {
   return [checkClaude(), checkCodex()];
 }
 
-function printReport(results) {
-  console.log('\n── Preflight de autenticação ──────────────────');
+// --- Relatório de CLI: resolve as chaves i18n contra um locale de `locales/`. ---
+function loadAuthMessages(lang) {
+  const tryLoad = (code) => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, `${code}.json`), 'utf8')).auth || null;
+    } catch {
+      return null;
+    }
+  };
+  return tryLoad(lang) || tryLoad('en') || {};
+}
+
+function format(template, vars) {
+  if (!template) return '';
+  return template.replace(/\{(\w+)\}/g, (_m, key) => (vars && vars[key] != null ? vars[key] : ''));
+}
+
+function printReport(results, lang = process.env.DASH_LANG || 'en') {
+  const messages = loadAuthMessages(lang);
+  const t = (key, vars) => format(messages[key] || key, vars);
+
+  console.log('\n── ' + t('reportHeader') + ' ──────────────────');
   let needs = 0;
   for (const r of results) {
-    const tag = r.ok ? 'OK  ' : 'AÇÃO';
-    console.log(`  [${tag}] ${r.label.padEnd(13)} ${r.detail}`);
-    if (!r.ok && r.hint) { console.log(`         ↳ ${r.hint}`); needs++; }
+    const tag = (r.ok ? t('reportOk') : t('reportAction')).padEnd(4);
+    console.log(`  [${tag}] ${r.label.padEnd(13)} ${t(r.detailKey, r.detailVars)}`);
+    if (!r.ok && r.hintKey) {
+      console.log(`         ↳ ${t(r.hintKey)}`);
+      needs++;
+    }
   }
-  if (needs === 0) console.log('  Tudo autenticado. ✓');
-  else console.log(`\n  ${needs} fonte(s) precisam de re-autenticação (veja acima).`);
+  if (needs === 0) console.log('  ' + t('reportAllOk') + ' ✓');
+  else console.log('\n  ' + t('reportNeeds', { count: String(needs) }));
   console.log('───────────────────────────────────────────────\n');
 }
 
-module.exports = { checkAll, printReport };
+module.exports = { checkAll, checkClaude, checkCodex, checkOpenCode, printReport };

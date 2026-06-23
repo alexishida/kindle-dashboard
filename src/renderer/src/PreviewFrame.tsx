@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import type { SupportedLanguage } from '../../shared/types'
 
 const NATIVE_WIDTH = 1448
 const NATIVE_HEIGHT = 1072
 
 interface PreviewFrameProps {
   baseUrl: string
-  language: 'en' | 'pt-BR' | 'es'
+  language: SupportedLanguage
   previewKey: number
 }
 

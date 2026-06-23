@@ -58,6 +58,21 @@ test('GET /api/auth returns local credential status', async () => {
   assert.deepEqual(body.sources, [{ name: 'test', ok: true }]);
 });
 
+test('GET /api/i18n returns dashboard strings for a known language', async () => {
+  const response = await fetch(`${baseUrl}/api/i18n?lang=pt-BR`);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.meta.locale, 'pt-BR');
+  assert.equal(typeof body.dashboard.title, 'string');
+});
+
+test('GET /api/i18n falls back to English for an unknown language', async () => {
+  const response = await fetch(`${baseUrl}/api/i18n?lang=zz`);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.meta.locale, 'en-US');
+});
+
 test('GET /kindle/dash-autostart.sh serves the Kindle launcher', async () => {
   const response = await fetch(`${baseUrl}/kindle/dash-autostart.sh`);
   const body = await response.text();

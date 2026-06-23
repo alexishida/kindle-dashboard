@@ -1,0 +1,14 @@
+# Normalize text files to UTF-8; Git decides text vs binary automatically.
+* text=auto
+
+# Kindle launchers run on the device's Linux — force LF regardless of host OS.
+*.sh text eol=lf
+
+# Windows-only scripts stay CRLF.
+*.ps1 text eol=crlf
+
+# Binaries: never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary

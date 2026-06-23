@@ -13,6 +13,7 @@ const collectors = require('./collectors');
 const preflight = require('./preflight');
 
 const PORT = parseInt(process.env.PORT || '8787', 10);
+const LOCALES_DIR = path.resolve(__dirname, '..', 'locales');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -70,6 +71,18 @@ function isInside(root, candidate) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+// i18n para a render HTML: devolve só os namespaces que o navegador precisa.
+// Valida o código de idioma (evita path traversal) e cai para `en` se faltar.
+function readLocaleI18n(lang) {
+  const safe = /^[A-Za-z-]{2,12}$/.test(lang) ? lang : 'en';
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, `${safe}.json`), 'utf8'));
+    return { meta: data.meta || {}, dashboard: data.dashboard || {} };
+  } catch {
+    return safe === 'en' ? { meta: {}, dashboard: {} } : readLocaleI18n('en');
+  }
+}
+
 function createServer(deps = {}) {
   const collectAll = deps.collectAll || collectors.collectAll;
   const checkAll = deps.checkAll || preflight.checkAll;
@@ -85,6 +98,10 @@ function createServer(deps = {}) {
     }
     if (url === '/api/auth') {
       return send(res, 200, JSON.stringify({ checkedAt: new Date().toISOString(), sources: checkAll() }), { 'Content-Type': MIME['.json'] });
+    }
+    if (url === '/api/i18n') {
+      const lang = new URLSearchParams(requestUrl.split('?')[1] || '').get('lang') || 'en';
+      return send(res, 200, JSON.stringify(readLocaleI18n(lang)), { 'Content-Type': MIME['.json'] });
     }
     if (url === '/api/usage') {
       if (/[?&]mock=1/.test(requestUrl)) {

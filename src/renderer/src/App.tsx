@@ -363,7 +363,6 @@ export default function App(): React.JSX.Element {
         appCommit={runtime?.appCommit}
         appVersion={runtime?.appVersion}
         backendPill={backendPill}
-        configured={configured}
         nav={nav}
         navItems={navItems}
         onNav={setNav}
@@ -391,7 +390,7 @@ export default function App(): React.JSX.Element {
             </section>
           ) : null}
 
-          {nav === 'painel' && configured ? (
+          {nav === 'painel' ? (
             <PanelView baseUrl={runtime?.baseUrl} language={activeLanguage} previewKey={previewKey} t={t} />
           ) : null}
 

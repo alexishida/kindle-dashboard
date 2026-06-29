@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [v1.0.4](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-29
+
+Kindle Dashboard v1.0.4
+
+### Fixed
+
+- Kindle loop script now exits gracefully after `MAX_FAILURES` consecutive download failures (default: 6), returning normal Kindle behavior instead of looping forever when the PC is off.
+- `preventScreenSaver` is now released on script exit (any cause), fixing the white screen when opening KUAL while the loop was running.
+- Uninstall now removes all files from the Kindle (`dash-loop.sh`, `dash-autostart.env`, logs, pidfile, and `dash.png`).
+- Dashboard panel tab is no longer locked when the Kindle script is not installed — the local preview works independently of the Kindle setup.
+
+### Version
+
+- App version bumped to `1.0.4`.
+
 ## [v1.0.3](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-23
 
 Kindle Dashboard v1.0.3

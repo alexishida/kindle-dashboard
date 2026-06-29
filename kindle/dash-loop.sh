@@ -11,6 +11,7 @@ IMG=/mnt/us/dash.png
 INTERVAL="${INTERVAL:-45}"     # segundos entre atualizações
 FULL_EVERY="${FULL_EVERY:-20}" # full-refresh (flash anti-ghosting) a cada N ciclos
 WIFI_RETRY_EVERY="${WIFI_RETRY_EVERY:-3}" # tenta recuperar WiFi após N falhas seguidas
+MAX_FAILURES="${MAX_FAILURES:-6}" # para o script após N falhas consecutivas (0 = sem limite)
 STOP=/mnt/us/dash-loop.stop
 PIDFILE=/mnt/us/dash-loop.pid
 FBINK=/usr/bin/fbink
@@ -18,6 +19,7 @@ FBINK=/usr/bin/fbink
 case "$INTERVAL" in ''|*[!0-9]*) INTERVAL=45;; esac
 case "$FULL_EVERY" in ''|*[!0-9]*|0) FULL_EVERY=20;; esac
 case "$WIFI_RETRY_EVERY" in ''|*[!0-9]*|0) WIFI_RETRY_EVERY=3;; esac
+case "$MAX_FAILURES" in ''|*[!0-9]*) MAX_FAILURES=6;; esac
 if [ -z "$PC" ]; then
   echo "[dash-loop] PC is required. Set PC to http://<PC_IP>:<PORT>/dash.png"
   exit 2
@@ -31,6 +33,7 @@ fi
 echo $$ > "$PIDFILE"
 
 cleanup() {
+  lipc-set-prop com.lab126.powerd preventScreenSaver 0 2>/dev/null
   rm -f "$PIDFILE" "$IMG.tmp"
 }
 trap cleanup EXIT INT TERM
@@ -63,6 +66,11 @@ while [ ! -f "$STOP" ]; do
     rm -f "$IMG.tmp"
     failures=$((failures + 1))
     echo "[dash-loop] $(date) falha no curl (${failures} seguida(s))"
+    if [ "$MAX_FAILURES" -gt 0 ] && [ "$failures" -ge "$MAX_FAILURES" ]; then
+      echo "[dash-loop] $(date) ${failures} falhas consecutivas — encerrando, devolvendo controle ao Kindle"
+      lipc-set-prop com.lab126.powerd preventScreenSaver 0 2>/dev/null
+      exit 0
+    fi
     if [ $((failures % WIFI_RETRY_EVERY)) -eq 0 ]; then
       reconnect_wifi
     fi

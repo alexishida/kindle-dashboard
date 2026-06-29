@@ -7,7 +7,6 @@ interface SidebarProps {
   appCommit?: string
   appVersion?: string
   backendPill: { className: string; label: string }
-  configured: boolean
   nav: NavKey
   navItems: NavItem[]
   onNav: (key: NavKey) => void
@@ -19,7 +18,6 @@ export function Sidebar({
   appCommit,
   appVersion,
   backendPill,
-  configured,
   nav,
   navItems,
   onNav,
@@ -35,15 +33,13 @@ export function Sidebar({
 
       <nav className="nav">
         {navItems.map((item) => {
-          const locked = item.key === 'painel' && !configured
           return (
             <button
               key={item.key}
               type="button"
               className={`nav-item ${nav === item.key ? 'active' : ''}`}
               onClick={() => onNav(item.key)}
-              disabled={locked}
-              title={locked ? t('configureKindleFirst') : item.hint}
+              title={item.hint}
             >
               <span className="nav-icon" aria-hidden="true"><Icon name={item.icon} /></span>
               <span className="nav-text">

@@ -164,7 +164,10 @@ if [ -f ${shellQuote(REMOTE.jobTarget)} ] &&
   [ "$RESULT" -eq 0 ] || exit "$RESULT"
 fi
 initctl reload-configuration
-rm -f ${shellQuote(REMOTE.launcher)} ${shellQuote(REMOTE.jobSource)} ${shellQuote(REMOTE.disabled)}
+rm -f ${shellQuote(REMOTE.launcher)} ${shellQuote(REMOTE.jobSource)} ${shellQuote(REMOTE.disabled)} \
+      ${shellQuote(REMOTE.loop)} ${shellQuote(REMOTE.environment)} \
+      /mnt/us/dash-loop.log /mnt/us/dash-autostart.log \
+      /mnt/us/dash-loop.stop /mnt/us/dash-loop.pid /mnt/us/dash.png
 `, 'uninstall Upstart job');
 }
 

@@ -9,6 +9,7 @@ const CREDS = path.join(os.homedir(), '.claude', '.credentials.json');
 const URL = 'https://api.anthropic.com/api/oauth/usage';
 const UA = process.env.CLAUDE_UA || 'claude-cli/1.0.0 (external, cli)';
 const MIN_INTERVAL = 180000;
+const STALE_NOTE_KEY = 'claudeStale';
 
 let cache = { at: 0, data: null };
 let lastAttempt = 0; // gate: nunca bate no endpoint mais de 1x/MIN_INTERVAL (mesmo em erro → evita 429)
@@ -36,14 +37,37 @@ function shape(u) {
   return tool;
 }
 
+function resetMs(value) {
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function withoutExpiredWindows(tool, now = Date.now()) {
+  const windows = Array.isArray(tool.windows) ? tool.windows : [];
+  const liveWindows = windows.filter((window) => {
+    const resetAt = resetMs(window.resets_at);
+    return resetAt == null || resetAt > now;
+  });
+  if (liveWindows.length === windows.length) return tool;
+
+  const next = { ...tool, windows: liveWindows };
+  if (!liveWindows.length && windows.length) {
+    const staleSince = Math.max(...windows.map((window) => resetMs(window.resets_at) || 0));
+    next.confidence = 'stale';
+    next.staleSince = staleSince ? new Date(staleSince).toISOString() : null;
+    next.noteKey = STALE_NOTE_KEY;
+  }
+  return next;
+}
+
 async function collect() {
   const now = Date.now();
   if (cache.data && now - cache.at < MIN_INTERVAL) {
-    return { ...cache.data, confidence: 'cached' };
+    return withoutExpiredWindows({ ...cache.data, confidence: 'cached' }, now);
   }
   // gate de segurança: não repetir a chamada real antes de MIN_INTERVAL, nem em erro
   if (now - lastAttempt < MIN_INTERVAL) {
-    if (cache.data) return { ...cache.data, confidence: 'stale' };
+    if (cache.data) return withoutExpiredWindows({ ...cache.data, confidence: 'stale' }, now);
     return { tool: 'claude', label: 'Claude Code', windows: [], confidence: 'cooldown',
              error: 'aguardando intervalo (≥180s) antes de tentar de novo' };
   }
@@ -59,11 +83,11 @@ async function collect() {
       },
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = shape(await res.json());
+    const data = withoutExpiredWindows(shape(await res.json()), now);
     cache = { at: now, data };
     return data;
   } catch (e) {
-    if (cache.data) return { ...cache.data, confidence: 'stale', error: String(e.message || e) };
+    if (cache.data) return withoutExpiredWindows({ ...cache.data, confidence: 'stale', error: String(e.message || e) }, now);
     return { tool: 'claude', label: 'Claude Code', windows: [], confidence: 'error', error: String(e.message || e) };
   }
 }

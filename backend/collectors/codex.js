@@ -28,18 +28,25 @@ function rolloutsByRecency() {
     }
   };
   for (const root of ROOTS) walk(root);
-  return out.sort((a, b) => b.m - a.m).map((x) => x.p);
+  return out.sort((a, b) => b.m - a.m);
 }
 
-function* tokenCountsDesc(file) {
+function eventTimeMs(raw, payload, fallbackMs) {
+  const value = raw && (raw.timestamp || raw.created_at || raw.updated_at)
+    || payload && (payload.timestamp || payload.created_at || payload.updated_at);
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : fallbackMs;
+}
+
+function* tokenCountEvents(file) {
   const lines = fs.readFileSync(file, 'utf8').split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
+  for (let i = 0; i < lines.length; i++) {
     const ln = lines[i].trim();
     if (!ln) continue;
     let o;
     try { o = JSON.parse(ln); } catch { continue; }
     const p = o.payload || o;
-    if (p && p.type === 'token_count') yield p;
+    if (p && p.type === 'token_count') yield { line: i, raw: o, tokenCount: p };
   }
 }
 
@@ -100,25 +107,39 @@ async function collect() {
     const files = rolloutsByRecency();
     if (!files.length) throw new Error('nenhum rollout encontrado');
 
+    const events = [];
+    for (const file of files) {
+      for (const event of tokenCountEvents(file.p)) {
+        events.push({
+          ...event,
+          fileMtime: file.m,
+          observedAt: eventTimeMs(event.raw, event.tokenCount, file.m),
+        });
+      }
+    }
+    events.sort((a, b) =>
+      (b.observedAt - a.observedAt)
+      || (b.fileMtime - a.fileMtime)
+      || (b.line - a.line)
+    );
+
     const liveWindows = new Map();
     const staleWindows = new Map();
     let totalTokens = null;
     const now = Date.now();
 
-    // Varre do mais recente; janelas podem aparecer separadas em eventos diferentes.
-    for (const f of files) {
-      for (const tc of tokenCountsDesc(f)) {
-        if (totalTokens == null && tc.info && tc.info.total_token_usage) {
-          totalTokens = tc.info.total_token_usage.total_tokens;
+    // Varre eventos por timestamp real. mtime de arquivo arquivado pode mudar depois.
+    for (const event of events) {
+      const tc = event.tokenCount;
+      if (totalTokens == null && tc.info && tc.info.total_token_usage) {
+        totalTokens = tc.info.total_token_usage.total_tokens;
+      }
+      for (const w of limitWindows(tc.rate_limits)) {
+        if (w.resetMs && w.resetMs > now) {
+          if (!liveWindows.has(w.name)) liveWindows.set(w.name, w);
+        } else if (!staleWindows.has(w.name)) {
+          staleWindows.set(w.name, w);
         }
-        for (const w of limitWindows(tc.rate_limits)) {
-          if (w.resetMs && w.resetMs > now) {
-            if (!liveWindows.has(w.name)) liveWindows.set(w.name, w);
-          } else if (!staleWindows.has(w.name)) {
-            staleWindows.set(w.name, w);
-          }
-        }
-        if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
       }
       if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
     }

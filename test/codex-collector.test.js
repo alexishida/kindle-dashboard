@@ -41,6 +41,13 @@ function tokenCountEvent(totalTokens, primaryResetSeconds, secondaryResetSeconds
   };
 }
 
+function timestampedEvent(timestampSeconds, event) {
+  return {
+    timestamp: new Date(timestampSeconds * 1000).toISOString(),
+    ...event,
+  };
+}
+
 function loadCollectorForHome(homeDir) {
   process.env.HOME = homeDir;
   process.env.USERPROFILE = homeDir;
@@ -54,6 +61,34 @@ afterEach(() => {
   process.env.USERPROFILE = originalUserProfile;
   const modulePath = require.resolve('../backend/collectors/codex');
   delete require.cache[modulePath];
+});
+
+test('codex collector orders events by payload timestamp over archive mtime', async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kindle-dashboard-codex-'));
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  try {
+    const older = writeRollout(homeDir, path.join('archived_sessions', 'rollout-old-touched.jsonl'), [
+      timestampedEvent(nowSeconds - 120, tokenCountEvent(120000, nowSeconds + 3600, nowSeconds + 86400, 42)),
+    ]);
+    const newer = writeRollout(homeDir, path.join('sessions', '2026', '06', '30', 'rollout-current.jsonl'), [
+      timestampedEvent(nowSeconds - 60, tokenCountEvent(150000, nowSeconds + 3600, nowSeconds + 86400, 73)),
+    ]);
+    fs.utimesSync(older, new Date(), new Date());
+    fs.utimesSync(newer, new Date(Date.now() - 10000), new Date(Date.now() - 10000));
+
+    const collector = loadCollectorForHome(homeDir);
+    const result = await collector.collect();
+
+    assert.equal(result.confidence, 'live');
+    assert.deepEqual(result.windows, [
+      { name: '5h', pct: 73, resets_at: new Date((nowSeconds + 3600) * 1000).toISOString() },
+      { name: '7d', pct: 1, resets_at: new Date((nowSeconds + 86400) * 1000).toISOString() },
+    ]);
+    assert.deepEqual(result.tokens, { total: 150000 });
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
 });
 
 test('codex collector prefers live rate limits over stale fallback', async () => {

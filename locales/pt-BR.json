@@ -178,6 +178,7 @@
     "tokens": "Tokens",
     "sessions": "sessões",
     "goLimits": "limites do Go sem API",
+    "claudeStale": "limites do Claude desatualizados",
     "codexStale": "limites locais desatualizados (Codex usado fora do CLI)"
   }
 }

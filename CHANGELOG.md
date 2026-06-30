@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [v1.0.5](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-30
+
+Kindle Dashboard v1.0.5
+
+### Fixed
+
+- Fixed Codex local usage parsing so newer `token_count` events win over older archived rollout files whose filesystem timestamp changed later.
+- Fixed Claude usage caching so expired `5h`/`7d` windows are removed instead of being shown as current data.
+- Claude now marks fully expired cached limits as stale with a localized dashboard note.
+
+### Tests
+
+- Added collector coverage for Codex archive timestamp drift.
+- Added collector coverage for Claude cached and stale expired-window cases.
+
+### Version
+
+- App version bumped to `1.0.5`.
+
 ## [v1.0.4](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-29
 
 Kindle Dashboard v1.0.4

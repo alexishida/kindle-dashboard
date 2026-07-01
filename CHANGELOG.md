@@ -2,7 +2,9 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [v1.0.6](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-07-01
+
+Kindle Dashboard v1.0.6
 
 ### Fixed
 
@@ -16,6 +18,10 @@ All notable changes to this project are documented here.
 ### Tests
 
 - Added collector coverage for merging Codex rollouts across multiple homes by recency.
+
+### Version
+
+- App version bumped to `1.0.6`.
 
 ## [v1.0.5](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-30
 

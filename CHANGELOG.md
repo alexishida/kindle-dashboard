@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Codex usage now also reads sessions written by the VS Code Codex extension running under WSL (resolved via `\\wsl.localhost\<distro>`), so heavy in-editor usage is no longer missing from the dashboard when the CLI home (`~/.codex`) is empty.
+- Codex collector now reads rollouts newest-first with an early exit and asynchronous I/O, so scanning hundreds of WSL rollouts over UNC no longer blocks the main process.
+
+### Added
+
+- `CODEX_EXTRA_HOMES` (path-separated list) to point the Codex collector at extra `.codex` homes, and `CODEX_WSL_SCAN=0` to disable WSL discovery.
+
+### Tests
+
+- Added collector coverage for merging Codex rollouts across multiple homes by recency.
+
 ## [v1.0.5](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-06-30
 
 Kindle Dashboard v1.0.5

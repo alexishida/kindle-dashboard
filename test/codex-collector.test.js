@@ -6,6 +6,8 @@ const { afterEach, test } = require('node:test');
 
 const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
+const originalWslScan = process.env.CODEX_WSL_SCAN;
+const originalExtraHomes = process.env.CODEX_EXTRA_HOMES;
 
 function writeRollout(root, relativePath, events) {
   const file = path.join(root, '.codex', relativePath);
@@ -51,14 +53,24 @@ function timestampedEvent(timestampSeconds, event) {
 function loadCollectorForHome(homeDir) {
   process.env.HOME = homeDir;
   process.env.USERPROFILE = homeDir;
+  // Isola do WSL da maquina de dev: os testes usam homes sinteticas.
+  process.env.CODEX_WSL_SCAN = '0';
+  delete process.env.CODEX_EXTRA_HOMES;
   const modulePath = require.resolve('../backend/collectors/codex');
   delete require.cache[modulePath];
   return require('../backend/collectors/codex');
 }
 
+function restoreEnv(name, value) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 afterEach(() => {
-  process.env.HOME = originalHome;
-  process.env.USERPROFILE = originalUserProfile;
+  restoreEnv('HOME', originalHome);
+  restoreEnv('USERPROFILE', originalUserProfile);
+  restoreEnv('CODEX_WSL_SCAN', originalWslScan);
+  restoreEnv('CODEX_EXTRA_HOMES', originalExtraHomes);
   const modulePath = require.resolve('../backend/collectors/codex');
   delete require.cache[modulePath];
 });
@@ -197,6 +209,34 @@ test('codex collector names windows from window_minutes when keys drift', async 
     ]);
   } finally {
     fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test('codex collector merges rollouts from CODEX_EXTRA_HOMES by recency', async () => {
+  const primaryHome = fs.mkdtempSync(path.join(os.tmpdir(), 'kindle-dashboard-codex-'));
+  const extraHome = fs.mkdtempSync(path.join(os.tmpdir(), 'kindle-dashboard-codex-extra-'));
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  try {
+    // home local: dado mais antigo. home extra (ex.: /home/<user>/.codex do WSL): mais novo.
+    writeRollout(primaryHome, path.join('sessions', '2026', '06', '18', 'rollout-local.jsonl'), [
+      timestampedEvent(nowSeconds - 600, tokenCountEvent(90000, nowSeconds + 3600, nowSeconds + 86400, 20)),
+    ]);
+    writeRollout(extraHome, path.join('sessions', '2026', '06', '30', 'rollout-wsl.jsonl'), [
+      timestampedEvent(nowSeconds - 60, tokenCountEvent(8628038, nowSeconds + 3600, nowSeconds + 86400, 84)),
+    ]);
+
+    const collector = loadCollectorForHome(primaryHome);
+    process.env.CODEX_EXTRA_HOMES = path.join(extraHome, '.codex');
+    const result = await collector.collect();
+
+    assert.equal(result.confidence, 'live');
+    assert.deepEqual(result.tokens, { total: 8628038 });
+    assert.equal(result.windows[0].name, '5h');
+    assert.equal(result.windows[0].pct, 84);
+  } finally {
+    fs.rmSync(primaryHome, { recursive: true, force: true });
+    fs.rmSync(extraHome, { recursive: true, force: true });
   }
 });
 

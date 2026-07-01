@@ -3,31 +3,110 @@
 // token_count (quando a API devolve o header). Por isso varremos os rollouts do mais
 // recente para o mais antigo e pegamos total de tokens mais recente junto do melhor
 // rate_limit disponivel: preferimos janela ainda valida; se nao existir, caimos no stale.
+//
+// Homes: alem de ~/.codex (CLI Windows), a extensao do Codex no VSCode roda dentro do
+// WSL e grava em /home/<user>/.codex do distro. No Windows lemos essas homes via UNC
+// (\\wsl.localhost\<distro>\...). CODEX_EXTRA_HOMES adiciona homes manuais (lista com
+// separador de path). CODEX_WSL_SCAN=0/off desliga a varredura do WSL.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFile } = require('child_process');
 
-// O Codex move sessoes encerradas de sessions/ para archived_sessions/. Varremos
-// as duas: sessions/ pega a sessao ativa (mais recente), archived_sessions/ o resto.
-const CODEX_DIR = path.join(os.homedir(), '.codex');
-const ROOTS = [
-  path.join(CODEX_DIR, 'sessions'),
-  path.join(CODEX_DIR, 'archived_sessions'),
-];
 const EXPECTED_WINDOWS = ['5h', '7d'];
+const WSL_TTL_MS = 5 * 60 * 1000;
 
-function rolloutsByRecency() {
+function localCodexHome() {
+  return path.join(os.homedir(), '.codex');
+}
+
+function extraCodexHomes() {
+  const raw = process.env.CODEX_EXTRA_HOMES;
+  if (!raw) return [];
+  return raw.split(path.delimiter).map((s) => s.trim()).filter(Boolean);
+}
+
+function listWslDistros() {
+  return new Promise((resolve) => {
+    execFile(
+      'wsl.exe',
+      ['-l', '-q'],
+      { encoding: 'buffer', timeout: 4000, windowsHide: true, maxBuffer: 1 << 20 },
+      (err, stdout) => {
+        if (err || !stdout || !stdout.length) return resolve([]);
+        // wsl.exe emite UTF-16LE com nulls
+        const text = Buffer.isBuffer(stdout) ? stdout.toString('utf16le') : String(stdout);
+        const names = text.split(/\r?\n/).map((s) => s.replace(/\0/g, '').trim()).filter(Boolean);
+        resolve(names);
+      }
+    );
+  });
+}
+
+let wslCache = null; // { at, homes }
+async function wslCodexHomes() {
+  if (process.platform !== 'win32') return [];
+  const flag = String(process.env.CODEX_WSL_SCAN || '').toLowerCase();
+  if (flag === '0' || flag === 'off' || flag === 'false') return [];
+  const now = Date.now();
+  if (wslCache && now - wslCache.at < WSL_TTL_MS) return wslCache.homes;
+
+  const homes = [];
+  try {
+    for (const distro of await listWslDistros()) {
+      const base = `//wsl.localhost/${distro}`;
+      const candidates = [];
+      try {
+        for (const user of fs.readdirSync(`${base}/home`)) candidates.push(`${base}/home/${user}/.codex`);
+      } catch { /* distro sem /home legivel */ }
+      candidates.push(`${base}/root/.codex`);
+      for (const home of candidates) {
+        try {
+          if (fs.existsSync(`${home}/sessions`) || fs.existsSync(`${home}/archived_sessions`)) homes.push(home);
+        } catch { /* UNC indisponivel */ }
+      }
+    }
+  } catch { /* WSL ausente/desligado */ }
+
+  wslCache = { at: now, homes };
+  return homes;
+}
+
+async function codexHomes() {
+  const homes = [localCodexHome(), ...extraCodexHomes(), ...(await wslCodexHomes())];
+  return [...new Set(homes)];
+}
+
+// O Codex move sessoes encerradas de sessions/ para archived_sessions/. Varremos as
+// duas em cada home: sessions/ pega a sessao ativa (mais recente), archived_sessions/ o resto.
+function sessionRoots(homes) {
+  const roots = [];
+  for (const home of homes) {
+    roots.push(`${home}/sessions`, `${home}/archived_sessions`);
+  }
+  return roots;
+}
+
+// Assincrono para nao bloquear o processo main: a home do WSL vem por UNC e pode ter
+// centenas de rollouts. Descidas de diretorio em serie, stats do mesmo nivel em paralelo.
+async function rolloutsByRecency(roots) {
   const out = [];
-  const walk = (dir) => {
+  const walk = async (dir) => {
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    const subdirs = [];
+    const rolloutFiles = [];
     for (const e of entries) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.startsWith('rollout-') && e.name.endsWith('.jsonl')) out.push({ p, m: fs.statSync(p).mtimeMs });
+      if (e.isDirectory()) subdirs.push(p);
+      else if (e.name.startsWith('rollout-') && e.name.endsWith('.jsonl')) rolloutFiles.push(p);
     }
+    await Promise.all(rolloutFiles.map(async (p) => {
+      try { out.push({ p, m: (await fs.promises.stat(p)).mtimeMs }); } catch { /* sumiu no meio */ }
+    }));
+    for (const d of subdirs) await walk(d);
   };
-  for (const root of ROOTS) walk(root);
+  for (const root of roots) await walk(root);
   return out.sort((a, b) => b.m - a.m);
 }
 
@@ -38,16 +117,20 @@ function eventTimeMs(raw, payload, fallbackMs) {
   return Number.isFinite(parsed) ? parsed : fallbackMs;
 }
 
-function* tokenCountEvents(file) {
-  const lines = fs.readFileSync(file, 'utf8').split('\n');
+async function readTokenCountEvents(file) {
+  const events = [];
+  let content;
+  try { content = await fs.promises.readFile(file, 'utf8'); } catch { return events; }
+  const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i].trim();
     if (!ln) continue;
     let o;
     try { o = JSON.parse(ln); } catch { continue; }
     const p = o.payload || o;
-    if (p && p.type === 'token_count') yield { line: i, raw: o, tokenCount: p };
+    if (p && p.type === 'token_count') events.push({ line: i, raw: o, tokenCount: p });
   }
+  return events;
 }
 
 function resetMsForWindow(w) {
@@ -102,48 +185,75 @@ function orderedWindows(windowsByName) {
   return out;
 }
 
+// Escolhe total de tokens mais recente + melhor janela por nome, sempre pelo evento com
+// maior observedAt (timestamp real do payload; mtime de arquivo arquivado pode mudar).
+// Retorna tambem o menor observedAt entre os eventos "vencedores" quando ja temos tudo,
+// para o early-exit saber se algum arquivo ainda nao lido poderia mudar a escolha.
+function selectFromEvents(events, now) {
+  events.sort((a, b) =>
+    (b.observedAt - a.observedAt)
+    || (b.fileMtime - a.fileMtime)
+    || (b.line - a.line)
+  );
+
+  const liveWindows = new Map();
+  const staleWindows = new Map();
+  let totalTokens = null;
+  let tokensAt = Infinity;
+  const liveAt = new Map();
+
+  for (const event of events) {
+    const tc = event.tokenCount;
+    if (totalTokens == null && tc.info && tc.info.total_token_usage) {
+      totalTokens = tc.info.total_token_usage.total_tokens;
+      tokensAt = event.observedAt;
+    }
+    for (const w of limitWindows(tc.rate_limits)) {
+      if (w.resetMs && w.resetMs > now) {
+        if (!liveWindows.has(w.name)) { liveWindows.set(w.name, w); liveAt.set(w.name, event.observedAt); }
+      } else if (!staleWindows.has(w.name)) {
+        staleWindows.set(w.name, w);
+      }
+    }
+    if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
+  }
+
+  const complete = totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name));
+  let minWinnerAt = Infinity;
+  if (complete) {
+    minWinnerAt = tokensAt;
+    for (const name of EXPECTED_WINDOWS) minWinnerAt = Math.min(minWinnerAt, liveAt.get(name));
+  }
+  return { liveWindows, staleWindows, totalTokens, complete, minWinnerAt };
+}
+
 async function collect() {
   try {
-    const files = rolloutsByRecency();
+    const files = await rolloutsByRecency(sessionRoots(await codexHomes()));
     if (!files.length) throw new Error('nenhum rollout encontrado');
 
     const events = [];
-    for (const file of files) {
-      for (const event of tokenCountEvents(file.p)) {
+    const now = Date.now();
+    let selection = null;
+
+    // Le do mais recente pro mais antigo. Invariante: observedAt de um evento <= mtime do
+    // seu arquivo, logo apos ler todos os arquivos com mtime >= X ja vimos todo evento com
+    // observedAt > X. Assim paramos cedo quando ja temos tokens + janelas live e o proximo
+    // arquivo (mtime menor) nao pode conter evento mais novo que os vencedores.
+    for (let i = 0; i < files.length; i++) {
+      for (const event of await readTokenCountEvents(files[i].p)) {
         events.push({
           ...event,
-          fileMtime: file.m,
-          observedAt: eventTimeMs(event.raw, event.tokenCount, file.m),
+          fileMtime: files[i].m,
+          observedAt: eventTimeMs(event.raw, event.tokenCount, files[i].m),
         });
       }
-    }
-    events.sort((a, b) =>
-      (b.observedAt - a.observedAt)
-      || (b.fileMtime - a.fileMtime)
-      || (b.line - a.line)
-    );
-
-    const liveWindows = new Map();
-    const staleWindows = new Map();
-    let totalTokens = null;
-    const now = Date.now();
-
-    // Varre eventos por timestamp real. mtime de arquivo arquivado pode mudar depois.
-    for (const event of events) {
-      const tc = event.tokenCount;
-      if (totalTokens == null && tc.info && tc.info.total_token_usage) {
-        totalTokens = tc.info.total_token_usage.total_tokens;
-      }
-      for (const w of limitWindows(tc.rate_limits)) {
-        if (w.resetMs && w.resetMs > now) {
-          if (!liveWindows.has(w.name)) liveWindows.set(w.name, w);
-        } else if (!staleWindows.has(w.name)) {
-          staleWindows.set(w.name, w);
-        }
-      }
-      if (totalTokens != null && EXPECTED_WINDOWS.every((name) => liveWindows.has(name))) break;
+      selection = selectFromEvents(events, now);
+      const nextMtime = i + 1 < files.length ? files[i + 1].m : -Infinity;
+      if (selection.complete && nextMtime < selection.minWinnerAt) break;
     }
 
+    const { liveWindows, staleWindows, totalTokens } = selection;
     if (!liveWindows.size && !staleWindows.size && totalTokens == null) throw new Error('sem token_count utilizavel');
 
     const tool = { tool: 'codex', label: 'OpenAI Codex', windows: [], confidence: 'live' };

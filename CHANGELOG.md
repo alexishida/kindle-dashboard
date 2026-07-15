@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [v1.0.7](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-07-15
+
+Kindle Dashboard v1.0.7
+
+### Version
+
+- App version bumped to `1.0.7`.
+
 ## [v1.0.6](https://github.com/alexishida/kindle-dashboard/releases/latest) - 2026-07-01
 
 Kindle Dashboard v1.0.6

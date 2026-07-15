@@ -108,6 +108,8 @@
   var params = new URLSearchParams(location.search);
   var lang = params.get('lang') || 'en';
   var API = '/api/usage';
+  var readyId = params.get('ready');
+  var REQUEST_TIMEOUT_MS = 15000;
 
   // Liga o botao fechar da janela PiP (so existe quando pip=1 + preload pip.js).
   if (params.get('pip') === '1') {
@@ -202,6 +204,12 @@
            '</div>';
   }
 
+  function staleBar(name) {
+    return '<div class="row"><div class="label"><span>' + name + '</span><span>' +
+           copy('unavailable') + '</span></div>' +
+           '<div class="sub dim">! ' + copy('codexStale') + '</div></div>';
+  }
+
   function card(t) {
     var logo = LOGOS[t.tool] || '';
     var h = '<div class="card"><h2>' + logo + '<span>' + t.label + '</span></h2>';
@@ -215,6 +223,7 @@
              '<div class="sub dim">' + msg + '</div></div>';
     }
     (t.windows || []).forEach(function (w) { h += bar(w.name, w.pct, w.resets_at); });
+    (t.stale_windows || []).forEach(function (w) { h += staleBar(w.name); });
     if (t.noteKey) h += '<div class="sub dim">! ' + copy(t.noteKey) + '</div>';
     if (t.extra) {
       h += '<div class="sub">' + copy('extraUsage') + '</div>';
@@ -240,24 +249,53 @@
     var d = new Date(data.updatedAt || Date.now());
     document.getElementById('stamp').textContent =
       d.toLocaleDateString(locale()) + '  ' + d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
-    document.title = 'READY';
+    document.title = readyId ? 'READY:' + readyId : 'READY';
+  }
+
+  function unavailableDashboard() {
+    return {
+      updatedAt: new Date().toISOString(),
+      tools: [{
+        tool: 'dashboard',
+        label: copy('title'),
+        confidence: 'error',
+        error: copy('unavailableFallback')
+      }]
+    };
   }
 
   function getJSON(url, cb) {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
+    xhr.timeout = REQUEST_TIMEOUT_MS;
+    var completed = false;
+    function finish(data) {
+      if (completed) return;
+      completed = true;
+      cb(data);
+    }
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
       if (xhr.status >= 200 && xhr.status < 300) {
-        try { cb(JSON.parse(xhr.responseText)); return; } catch (_error) {}
+        try { finish(JSON.parse(xhr.responseText)); return; } catch (_error) {}
       }
-      cb(null);
+      finish(null);
     };
+    xhr.onerror = xhr.ontimeout = function () { finish(null); };
     xhr.send();
   }
 
-  // Carrega i18n primeiro (texto/locale/moeda); depois os dados e renderiza.
   document.documentElement.lang = lang;
+  var i18nLoaded = false;
+  var usageLoaded = false;
+  var usage = null;
+
+  function renderWhenReady() {
+    if (!i18nLoaded || !usageLoaded) return;
+    document.getElementById('title').textContent = copy('title');
+    render(usage || unavailableDashboard());
+  }
+
   getJSON('/api/i18n?lang=' + encodeURIComponent(lang), function (data) {
     if (data && data.dashboard) {
       i18n = {
@@ -266,10 +304,13 @@
         copy: data.dashboard
       };
     }
-    document.getElementById('title').textContent = copy('title');
-    getJSON(API + '?_=' + Date.now(), function (usage) {
-      if (usage) render(usage);
-    });
+    i18nLoaded = true;
+    renderWhenReady();
+  });
+  getJSON(API + '?_=' + Date.now(), function (data) {
+    usage = data;
+    usageLoaded = true;
+    renderWhenReady();
   });
 })();
 </script>

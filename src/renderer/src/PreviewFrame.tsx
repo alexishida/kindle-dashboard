@@ -11,12 +11,10 @@ interface PreviewFrameProps {
 }
 
 /**
- * Mostra o dashboard na orientacao paisagem (Kindle deitado) usando o mesmo
- * caminho de captura que gera o PNG real (`captureScale`). O render se auto-escala
- * para `1448*scale x 1072*scale`; dimensionamos o iframe igual, sem transform,
- * garantindo encaixe exato sem corte.
+ * Mostra PNG final servido ao Kindle. O arquivo e retrato, portanto a previa o
+ * gira para paisagem sem buscar os coletores uma segunda vez.
  */
-export default function PreviewFrame({ baseUrl, language, previewKey }: PreviewFrameProps): React.JSX.Element {
+export default function PreviewFrame({ baseUrl, language: _language, previewKey }: PreviewFrameProps): React.JSX.Element {
   const stageRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0)
 
@@ -41,12 +39,15 @@ export default function PreviewFrame({ baseUrl, language, previewKey }: PreviewF
   return (
     <div className="preview-stage" ref={stageRef}>
       {scale > 0 ? (
-        <iframe
+        <img
           key={`${previewKey}-${scale}`}
-          className="preview-frame"
-          title="Previa do dashboard"
-          src={`${baseUrl}/render?captureScale=${scale}&preview=${previewKey}&lang=${encodeURIComponent(language)}`}
-          style={{ width: NATIVE_WIDTH * scale, height: NATIVE_HEIGHT * scale }}
+          className="preview-frame preview-image"
+          alt="Previa do dashboard"
+          src={`${baseUrl}/dash.png?preview=${previewKey}`}
+          style={{
+            height: NATIVE_WIDTH * scale,
+            width: NATIVE_HEIGHT * scale,
+          }}
         />
       ) : null}
     </div>

@@ -8,6 +8,7 @@ const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
 const originalWslScan = process.env.CODEX_WSL_SCAN;
 const originalExtraHomes = process.env.CODEX_EXTRA_HOMES;
+const originalAppServer = process.env.CODEX_APP_SERVER;
 
 function writeRollout(root, relativePath, events) {
   const file = path.join(root, '.codex', relativePath);
@@ -55,6 +56,7 @@ function loadCollectorForHome(homeDir) {
   process.env.USERPROFILE = homeDir;
   // Isola do WSL da maquina de dev: os testes usam homes sinteticas.
   process.env.CODEX_WSL_SCAN = '0';
+  process.env.CODEX_APP_SERVER = '0';
   delete process.env.CODEX_EXTRA_HOMES;
   const modulePath = require.resolve('../backend/collectors/codex');
   delete require.cache[modulePath];
@@ -71,8 +73,36 @@ afterEach(() => {
   restoreEnv('USERPROFILE', originalUserProfile);
   restoreEnv('CODEX_WSL_SCAN', originalWslScan);
   restoreEnv('CODEX_EXTRA_HOMES', originalExtraHomes);
+  restoreEnv('CODEX_APP_SERVER', originalAppServer);
   const modulePath = require.resolve('../backend/collectors/codex');
   delete require.cache[modulePath];
+});
+
+test('codex collector uses account rate limits from app-server', async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kindle-dashboard-codex-'));
+  const resetSeconds = Math.floor(Date.now() / 1000) + 86400;
+
+  try {
+    const collector = loadCollectorForHome(homeDir);
+    process.env.CODEX_APP_SERVER = '1';
+    const result = await collector.collect({
+      readAccountData: async () => ({
+        rateLimits: {
+          primary: { usedPercent: 38, windowDurationMins: 10080, resetsAt: resetSeconds },
+          secondary: null,
+        },
+        usage: { summary: { lifetimeTokens: 992470794 } },
+      }),
+    });
+
+    assert.equal(result.confidence, 'live');
+    assert.deepEqual(result.windows, [
+      { name: '7d', pct: 38, resets_at: new Date(resetSeconds * 1000).toISOString() },
+    ]);
+    assert.deepEqual(result.tokens, { total: 992470794 });
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
 });
 
 test('codex collector orders events by payload timestamp over archive mtime', async () => {

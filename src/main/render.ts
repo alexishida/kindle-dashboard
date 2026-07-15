@@ -25,6 +25,7 @@ let renderTimer: NodeJS.Timeout | null = null
 let renderIntervalSeconds = 0
 let renderInFlight: Promise<RenderResult> | null = null
 let lastRenderResult: RenderResult | null = null
+const RENDER_READY_TIMEOUT_MS = 20000
 
 export function getIntervalSeconds(): number {
   return renderIntervalSeconds
@@ -95,10 +96,10 @@ function createCaptureWindow(viewport: CaptureViewport): BrowserWindow {
   return window
 }
 
-async function waitUntilReady(window: BrowserWindow): Promise<void> {
-  const deadline = Date.now() + 10000
+async function waitUntilReady(window: BrowserWindow, readyTitle: string): Promise<void> {
+  const deadline = Date.now() + RENDER_READY_TIMEOUT_MS
   while (Date.now() < deadline) {
-    if (window.webContents.getTitle() === 'READY') return
+    if (window.webContents.getTitle() === readyTitle) return
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
   throw new Error(text('renderTimeout'))
@@ -124,11 +125,13 @@ async function performRender(): Promise<RenderResult> {
     captureWindow.setContentSize(viewport.width, viewport.height)
   }
 
+  const captureId = Date.now().toString()
   const captureScale = viewport.scale.toFixed(6)
+  const readyTitle = `READY:${captureId}`
   await captureWindow.loadURL(
-    `${BASE_URL}/render?capture=${Date.now()}&captureScale=${captureScale}&lang=${encodeURIComponent(getActiveLanguage())}`,
+    `${BASE_URL}/render?capture=${captureId}&ready=${encodeURIComponent(captureId)}&captureScale=${captureScale}&lang=${encodeURIComponent(getActiveLanguage())}`,
   )
-  await waitUntilReady(captureWindow)
+  await waitUntilReady(captureWindow, readyTitle)
   const image = await captureWindow.webContents.capturePage({
     x: 0,
     y: 0,

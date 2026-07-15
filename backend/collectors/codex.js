@@ -11,10 +11,97 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFile } = require('child_process');
+const readline = require('readline');
+const { execFile, spawn } = require('child_process');
 
 const EXPECTED_WINDOWS = ['5h', '7d'];
 const WSL_TTL_MS = 5 * 60 * 1000;
+const APP_SERVER_TIMEOUT_MS = 5000;
+
+function appServerEnabled() {
+  const flag = String(process.env.CODEX_APP_SERVER || '').toLowerCase();
+  return !['0', 'off', 'false'].includes(flag);
+}
+
+function readAccountData() {
+  return new Promise((resolve, reject) => {
+    const command = process.env.CODEX_BIN || 'codex';
+    let child;
+    try {
+      child = spawn(command, ['app-server'], {
+        stdio: ['pipe', 'pipe', 'ignore'],
+        windowsHide: true,
+      });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    const responses = new Map();
+    const lines = readline.createInterface({ input: child.stdout });
+    let settled = false;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      lines.close();
+      child.kill();
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const finish = () => {
+      if (settled || !responses.has(1) || !responses.has(2)) return;
+      settled = true;
+      const result = {
+        rateLimits: responses.get(1).rateLimits || {},
+        usage: responses.get(2),
+      };
+      cleanup();
+      resolve(result);
+    };
+    const send = (message) => {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    };
+    const timer = setTimeout(() => fail(new Error('Codex app-server timeout')), APP_SERVER_TIMEOUT_MS);
+
+    child.once('error', fail);
+    child.once('exit', (code) => {
+      if (!settled) fail(new Error(`Codex app-server exited (${code ?? 'unknown'})`));
+    });
+    lines.on('line', (line) => {
+      let message;
+      try { message = JSON.parse(line); } catch { return; }
+
+      if (message.id === 0) {
+        if (message.error) return fail(new Error('Codex app-server initialization failed'));
+        send({ method: 'initialized', params: {} });
+        send({ method: 'account/rateLimits/read', id: 1, params: null });
+        send({ method: 'account/usage/read', id: 2, params: null });
+        return;
+      }
+      if (message.id !== 1 && message.id !== 2) return;
+      if (message.error) return fail(new Error('Codex account usage request failed'));
+      responses.set(message.id, message.result || {});
+      finish();
+    });
+
+    send({
+      method: 'initialize',
+      id: 0,
+      params: {
+        clientInfo: {
+          name: 'kindle_dashboard',
+          title: 'Kindle Dashboard',
+          version: '1.0.7',
+        },
+        capabilities: { experimentalApi: true },
+      },
+    });
+  });
+}
 
 function localCodexHome() {
   return path.join(os.homedir(), '.codex');
@@ -185,6 +272,37 @@ function orderedWindows(windowsByName) {
   return out;
 }
 
+function shapeAccountData(data) {
+  const rateLimits = data && data.rateLimits || {};
+  const windowsByName = new Map();
+
+  for (const [key, window] of [['primary', rateLimits.primary], ['secondary', rateLimits.secondary]]) {
+    if (!window || typeof window !== 'object') continue;
+    const pct = Number(window.usedPercent);
+    if (!Number.isFinite(pct)) continue;
+    const minutes = Number(window.windowDurationMins);
+    const resetsAt = Number(window.resetsAt);
+    if (Number.isFinite(resetsAt) && resetsAt > 0 && resetsAt * 1000 <= Date.now()) continue;
+
+    const item = { name: windowName(key, { window_minutes: minutes }), pct };
+    if (Number.isFinite(resetsAt) && resetsAt > 0) item.resets_at = new Date(resetsAt * 1000).toISOString();
+    windowsByName.set(item.name, item);
+  }
+
+  const totalTokens = Number(data && data.usage && data.usage.summary && data.usage.summary.lifetimeTokens);
+  const windows = orderedWindows(windowsByName);
+  if (!windows.length && !Number.isFinite(totalTokens)) throw new Error('Codex account usage unavailable');
+
+  const tool = {
+    tool: 'codex',
+    label: 'OpenAI Codex',
+    windows,
+    confidence: windows.length ? 'live' : 'partial',
+  };
+  if (Number.isFinite(totalTokens)) tool.tokens = { total: totalTokens };
+  return tool;
+}
+
 // Escolhe total de tokens mais recente + melhor janela por nome, sempre pelo evento com
 // maior observedAt (timestamp real do payload; mtime de arquivo arquivado pode mudar).
 // Retorna tambem o menor observedAt entre os eventos "vencedores" quando ja temos tudo,
@@ -227,7 +345,7 @@ function selectFromEvents(events, now) {
   return { liveWindows, staleWindows, totalTokens, complete, minWinnerAt };
 }
 
-async function collect() {
+async function collectFromRollouts() {
   try {
     const files = await rolloutsByRecency(sessionRoots(await codexHomes()));
     if (!files.length) throw new Error('nenhum rollout encontrado');
@@ -258,6 +376,8 @@ async function collect() {
 
     const tool = { tool: 'codex', label: 'OpenAI Codex', windows: [], confidence: 'live' };
     if (totalTokens != null) tool.tokens = { total: totalTokens };
+    const stale = orderedWindows(staleWindows);
+    if (stale.length) tool.stale_windows = stale;
 
     // Honestidade: cada janela local so vale enquanto seu reset_at ainda e futuro.
     if (liveWindows.size) {
@@ -274,6 +394,16 @@ async function collect() {
   } catch (e) {
     return { tool: 'codex', label: 'OpenAI Codex', windows: [], confidence: 'error', error: String(e.message || e) };
   }
+}
+
+async function collect(options = {}) {
+  if (appServerEnabled()) {
+    try {
+      const reader = options.readAccountData || readAccountData;
+      return shapeAccountData(await reader());
+    } catch { /* app-server ausente/antigo: cai para rollouts locais */ }
+  }
+  return collectFromRollouts();
 }
 
 module.exports = { collect };

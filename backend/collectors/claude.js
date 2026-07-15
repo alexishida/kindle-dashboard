@@ -9,6 +9,7 @@ const CREDS = path.join(os.homedir(), '.claude', '.credentials.json');
 const URL = 'https://api.anthropic.com/api/oauth/usage';
 const UA = process.env.CLAUDE_UA || 'claude-cli/1.0.0 (external, cli)';
 const MIN_INTERVAL = 180000;
+const REQUEST_TIMEOUT_MS = 7000;
 const STALE_NOTE_KEY = 'claudeStale';
 
 let cache = { at: 0, data: null };
@@ -75,6 +76,7 @@ async function collect() {
   try {
     const token = readToken();
     const res = await fetch(URL, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         Authorization: 'Bearer ' + token,
         'anthropic-beta': 'oauth-2025-04-20',
